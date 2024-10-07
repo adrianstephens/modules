@@ -1,0 +1,141 @@
+@font-face {
+	font-family: "codicon";
+	src: url("./codicon.ttf?9642aa1d48ab4e55aa1bf3f0b8678aa1") format("truetype");
+}
+
+.codicon {
+	font: normal normal normal 16px/1 codicon;
+	display: inline-block;
+	text-decoration: none;
+	text-rendering: auto;
+	text-align: center;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	user-select: none;
+	-webkit-user-select: none;
+	-ms-user-select: none;
+}
+
+body {
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	font-weight: var(--vscode-font-weight);
+	color: var(--vscode-foreground);
+	background-color: var(--vscode-debugView-background);
+	padding: 0;
+	margin: 0;
+}
+
+table {
+	width: auto;
+	border-collapse: separate;
+	border-spacing: 0;
+	margin-bottom: 1em;
+	table-layout: auto;
+}
+
+thead {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	background-color: var(--vscode-debugView-background);
+}
+
+th, td {
+	padding: 4px 8px;
+	border: none;
+	text-align: left;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+th {
+	font-weight: normal;
+	background-color: var(--vscode-editor-background);
+	color: var(--vscode-foreground);
+	border-bottom: 1px solid var(--vscode-panel-border);
+	cursor: pointer;
+	user-select: none;
+}
+
+th.sort {
+	font-weight: bold;
+	&::before {
+		font-family: 'codicon';
+		content: '\eab4';
+	}
+	&.up::before {
+		content: '\eab7';
+	}
+}
+
+tr {
+	background-color: var(--vscode-debugView-background);
+}
+/*
+tr:nth-child(even) {
+	background-color: var(--vscode-list-hoverBackground);
+}
+*/
+tr:hover {
+	background-color: var(--vscode-list-hoverBackground);
+}
+
+tr.selected {
+	background-color: var(--vscode-list-activeSelectionBackground);
+	color: var(--vscode-list-activeSelectionForeground);
+}
+
+.path-cell {
+	white-space: nowrap;
+	overflow: hidden;
+	position: relative;
+}
+
+.path-dir, .path-filename {
+	display: inline-block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	vertical-align: bottom;
+}
+
+.path-cell:hover::after {
+	content: attr(title);
+	position: absolute;
+	left: 0;
+	top: 100%;
+	background-color: var(--vscode-editor-background);
+	border: 1px solid var(--vscode-panel-border);
+	padding: 5px;
+	z-index: 1;
+	white-space: normal;
+	word-break: break-all;
+	max-width: 300px;
+}
+
+button.normal {
+	color: var(--vscode-button-foreground);
+	background-color: var(--vscode-button-background);
+	border: 1px solid var(--vscode-button-border, transparent);
+	border-radius: 2px;
+	padding: 4px 8px;
+	cursor: pointer;
+}
+
+button.normal:hover {
+	background-color: var(--vscode-button-hoverBackground);
+}
+
+button.codicon {
+	border: none;
+	background-color: transparent;
+	padding: 0;
+	cursor: pointer;
+	color: var(--vscode-icon-foreground);
+}
+
+button.codicon:hover {
+	color: var(--vscode-icon-foreground);
+	opacity: 0.8;
+}

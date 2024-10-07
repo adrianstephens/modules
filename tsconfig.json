@@ -1,0 +1,25 @@
+{
+	"compilerOptions": {
+		"target": "es2022",
+		"module": "CommonJS",
+		"moduleResolution": "Node10",
+		"lib": [
+			"es2022",
+			"ES2021.String"
+		],
+		"baseUrl": ".",
+		"paths": {
+			"./out/*": ["./src/*"]
+		},
+		"outDir": "out",
+		"sourceMap": true,
+		"strict": true,
+		"rootDir": "src",
+		"jsx": "react",
+		"jsxFactory": "jsx",
+		"jsxFragmentFactory": "fragment",
+		"forceConsistentCasingInFileNames": true
+	},
+	"include": ["src"],
+	"exclude": ["node_modules", ".vscode-test", "hidden"]
+}

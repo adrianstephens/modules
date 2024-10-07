@@ -1,0 +1,59 @@
+{
+	"name": "vstools",
+	"displayName": "Modules",
+	"description": "Modules display in Code's debugger",
+	"icon": "media/icon.png",
+	"version": "0.0.1",
+	"publisher": "adrianstephens",
+	"repository": "https://github.com/adrianstephens/modules",
+	"files": [
+		"out/*",
+		"assets/*",
+		"LICENSE.txt"
+	],
+	"engines": {
+		"vscode": "^1.74.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"activationEvents": [
+	],
+	"main": "./out/extension.js",
+	"contributes": {
+		"views": {
+			"debug": [
+				{
+					"id": "modules-view",
+					"name": "Modules",
+					"type": "webview"
+				}
+			]
+		},
+		"commands":[
+			{
+				"command": "modules.sendDAPRequest",
+				"title": "Send DAP Request"
+			}
+		]
+	},
+	"scripts": {
+		"vscode:prepublish": "npm run compile",
+		"compile": "tsc -p ./",
+		"lint": "eslint \"src/**/*.ts\"",
+		"watch": "tsc -watch -p ./",
+		"icons": "node ./icons.js"
+	},
+	"devDependencies": {
+		"@types/node": "^18",
+		"@types/vscode": "^1.73.0",
+		"@typescript-eslint/eslint-plugin": "^7.14.0",
+		"@typescript-eslint/parser": "^7.14.0",
+		"@vscode/codicons": "^0.0.20",
+		"eslint": "^8.26.0",
+		"vscode-debugprotocol": "^1.51.0"
+	},
+	"dependencies": {
+		"source-map-support": "^0.5.21"
+	}
+}
