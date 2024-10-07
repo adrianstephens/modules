@@ -4,7 +4,7 @@
 	"description": "Modules display in Code's debugger",
 	"icon": "assets/icon3.png",
 	"version": "0.0.2",
-	"publisher": "adrianstephens",
+	"publisher": "isopodlabs",
 	"repository": "https://github.com/adrianstephens/modules",
 	"files": [
 		"out/*",
