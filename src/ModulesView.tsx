@@ -132,7 +132,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 
 		webviewView.webview.options = {
 			enableScripts: true,
-			localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'media')]
+			localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'assets')]
 		};
 		this.update.trigger();
 	}
@@ -186,7 +186,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 	}
 
 	getUri(name: string) {
-		return  this.view!.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', name));
+		return  this.view!.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'assets', name));
 	}
 
 	updateView(modules: Module[]) : string {

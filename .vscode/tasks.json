@@ -15,6 +15,32 @@
 				"kind": "build",
 				"isDefault": true
 			}
-		}
-	]
+		},
+        {
+            "type": "shell",
+            "label": "prepublish",
+            "command": "git add . & if not ${input:version}==none npm version ${input:version} --force",
+            "problemMatcher": [],
+            "dependsOn": [
+                "npm: compile"
+            ]
+        },
+        {
+            "type": "shell",
+            "label": "PUBLISH",
+            "command": "vsce publish",
+            "problemMatcher": [],
+            "dependsOn": "prepublish"
+        }
+
+	],
+    "inputs": [
+        {
+            "id": "version",
+            "description": "Version bump:",
+            "type": "pickString",
+            "options": ["none", "patch", "minor", "major"],
+            "default": "none"
+        },
+    ]
 }

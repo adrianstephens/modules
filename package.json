@@ -1,15 +1,16 @@
 {
-	"name": "vstools",
+	"name": "modules",
 	"displayName": "Modules",
 	"description": "Modules display in Code's debugger",
-	"icon": "media/icon.png",
+	"icon": "assets/icon3.png",
 	"version": "0.0.1",
 	"publisher": "adrianstephens",
 	"repository": "https://github.com/adrianstephens/modules",
 	"files": [
 		"out/*",
 		"assets/*",
-		"LICENSE.txt"
+		"LICENSE.txt",
+		"CHANGELOG.md"
 	],
 	"engines": {
 		"vscode": "^1.74.0"
@@ -42,7 +43,7 @@
 		"compile": "tsc -p ./",
 		"lint": "eslint \"src/**/*.ts\"",
 		"watch": "tsc -watch -p ./",
-		"icons": "node ./icons.js"
+		"publish": "vsce publish patch"
 	},
 	"devDependencies": {
 		"@types/node": "^18",
