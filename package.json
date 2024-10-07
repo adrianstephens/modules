@@ -3,14 +3,13 @@
 	"displayName": "Modules",
 	"description": "Modules display in Code's debugger",
 	"icon": "assets/icon3.png",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"publisher": "adrianstephens",
 	"repository": "https://github.com/adrianstephens/modules",
 	"files": [
 		"out/*",
 		"assets/*",
-		"LICENSE.txt",
-		"CHANGELOG.md"
+		"LICENSE.txt"
 	],
 	"engines": {
 		"vscode": "^1.74.0"
@@ -18,8 +17,7 @@
 	"categories": [
 		"Other"
 	],
-	"activationEvents": [
-	],
+	"activationEvents": [],
 	"main": "./out/extension.js",
 	"contributes": {
 		"views": {
@@ -31,7 +29,7 @@
 				}
 			]
 		},
-		"commands":[
+		"commands": [
 			{
 				"command": "modules.sendDAPRequest",
 				"title": "Send DAP Request"
