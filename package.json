@@ -3,7 +3,7 @@
 	"displayName": "Modules",
 	"description": "Modules display in Code's debugger",
 	"icon": "assets/icon3.png",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"publisher": "isopodlabs",
 	"repository": "https://github.com/adrianstephens/modules",
 	"files": [
@@ -15,7 +15,8 @@
 		"vscode": "^1.74.0"
 	},
 	"categories": [
-		"Other"
+		"Debuggers",
+		"Visualization"
 	],
 	"activationEvents": [],
 	"main": "./out/extension.js",
