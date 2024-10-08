@@ -2,8 +2,8 @@
 	"name": "modules",
 	"displayName": "Modules",
 	"description": "Modules display in Code's debugger",
-	"icon": "assets/icon3.png",
-	"version": "0.0.3",
+	"icon": "assets/icon.png",
+	"version": "0.0.4",
 	"publisher": "isopodlabs",
 	"repository": "https://github.com/adrianstephens/modules",
 	"files": [
