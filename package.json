@@ -3,7 +3,7 @@
 	"displayName": "Modules",
 	"description": "Modules display in Code's debugger",
 	"icon": "assets/icon.png",
-	"version": "0.0.4",
+	"version": "0.0.5",
 	"publisher": "isopodlabs",
 	"repository": "https://github.com/adrianstephens/modules",
 	"files": [
