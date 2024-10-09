@@ -28,7 +28,9 @@ function tableBody(entries: any[], func:(i:any)=>string) {
 	</tbody>;
 }
 
-type Module = DebugProtocol.Module;
+type Module = DebugProtocol.Module & {
+	[key: string]: any;
+};
 
 function getModuleAddress(session: vscode.DebugSession, frameId: number, m: Module, func: string) {
 	return session.customRequest('evaluate', { 
@@ -70,11 +72,16 @@ interface ColumnDescriptor {
 function columnBoolean(b?: boolean) {
 	return <td>{b == undefined ? '?' : b ? 'Yes' : 'No'}</td>;
 }
+function columnAddress(m: Module, address?: string) {
+	return <td id={m.id+'-start'}>{address ?? 'N/A'}</td>;
+}
 
 const column_descriptors: Record<string, ColumnDescriptor> = {
 	id: 			{label:	'ID'},
 	name: 			{label: 'Name'},
-	addressRange:  	{label: 'Address',		html:	m => <td class='address' id={m.id+'-start'}>{m.addressRange ?? 'N/A'}</td>},
+	addressRange:  	{label: 'Address',		html:	m => columnAddress(m, m.addressRange)},
+	vsLoadAddress: 	{label: "Address",		html:	m => columnAddress(m, m.vsLoadAddress)},
+	vsModuleSize: 	{label: "Size"},
 	path:   		{label: 'Path',			html:	m => {
 		const mod_path = m.path ?? '';
 		const directory = path.dirname(mod_path);
@@ -84,11 +91,15 @@ const column_descriptors: Record<string, ColumnDescriptor> = {
 			<span>{filename}</span>
 		</td>;
 	}},
+	vsIs64Bit: 		{label: "64 Bit", 		html: m => columnBoolean(m.vsIs64Bit)},
 	isOptimized:   	{label: 'Optimized', 	html: m => columnBoolean(m.isOptimized)},
 	isUserCode: 	{label: 'User Code', 	html: m => columnBoolean(m.isUserCode)},
 	version:    	{label: 'Version'},
 	symbolFilePath:	{label: 'Symbols',		html: m => <td>{m.symbolFilePath ?? m.symbolStatus}</td>},
 	dateTimeStamp: 	{label: 'Time Stamp'},
+	vsTimestampUTC: {label: 'Time Stamp'},
+	//	vsPreferredLoadAddress: "4324950016",
+	//	vsLoadOrder: 1,
 };
 
 const DEBUG_MEMORY_SCHEME = 'vscode-debug-memory';
@@ -257,7 +268,10 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 			</html>;
 
 		const has_col	= modules.reduce((cols, m) => (Object.keys(m).forEach(k => cols.add(k)), cols), new Set<string>());
-		has_col.add('addressRange');
+
+		if (!has_col.has('addressRange') && !has_col.has('vsLoadAddress'))
+			has_col.add('addressRange');
+
 		const cols		= Object.keys(column_descriptors).filter(k => has_col.has(k));
 
 		return `<!DOCTYPE html>`+
