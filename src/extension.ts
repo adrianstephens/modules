@@ -1,7 +1,3 @@
-if (process.env.NODE_ENV === 'development')
-	import('source-map-support').then(sms => sms.install());
-
-//import 'source-map-support/register';
 import * as vscode from 'vscode';
 import {ModuleWebViewProvider} from "./ModulesView";
 
