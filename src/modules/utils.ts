@@ -289,6 +289,14 @@ export function splitEvery(s : string, n : number) {
 		(_, i) => s.slice(i * n, (i + 1) * n)
 	);
 }
+
+export function tag(strings: TemplateStringsArray, ...keys: any[]) {
+    return ((...values: any[]) => {
+        const dict	= values.at(-1) || {};
+		return keys.map((key, i) => (Number.isInteger(key) ? values[key] : dict[key]) + strings[i + 1]).join('');
+    });
+}
+
 //-----------------------------------------------------------------------------
 //	text
 //-----------------------------------------------------------------------------

@@ -6,7 +6,7 @@ import {ModuleWebViewProvider} from "./ModulesView";
 //	DAP test
 //-----------------------------------------------------------------------------
 
-function sendDAPRequest() {
+async function sendDAPRequest() {
 	interface DAPRequest {
 		command: string;
 		args?: any;
@@ -19,35 +19,27 @@ function sendDAPRequest() {
 		return 'command' in x && typeof x.command === 'string' && (num_keys === 1 || num_keys === 2 && 'args' in x);
 	}
 	
-	function tryParseJSON(s: string) {
-		try {
-			return JSON.parse(s);
-		} catch {
-			return undefined;
-		}
+	try {
+		const session = vscode.debug.activeDebugSession;
+		if (!session)
+			throw "There's no active debug session.";
+
+		const editor = vscode.window.activeTextEditor;
+		if (!editor)
+			throw "Need an editor.";
+
+		const bodyJSON	= editor.document.getText(editor.selection.isEmpty ? undefined : editor.selection);
+		const body 		= JSON.parse(bodyJSON);
+
+		if (!isDAPRequest(body))
+			throw `Invalid DAP request. It should be of type: { command: string; args?: any }`;
+
+		const resp = await session.customRequest(body.command, body.args);
+		vscode.debug.activeDebugConsole.appendLine('sendDAPRequest:\n' + JSON.stringify(resp, undefined, 2));
+
+	} catch (error: any) {
+		vscode.window.showErrorMessage(error.toString());
 	}
-
-	const session = vscode.debug.activeDebugSession;
-	if (!session) {
-		vscode.window.showErrorMessage("There's no active debug session.");
-		return;
-	}
-
-	const editor = vscode.window.activeTextEditor;
-	if (!editor)
-		return;
-
-	const bodyJSON	= editor.document.getText(editor.selection.isEmpty ? undefined : editor.selection);
-	const body 		= tryParseJSON(bodyJSON);
-
-	if (!isDAPRequest(body)) {
-		vscode.window.showErrorMessage(`Invalid DAP request. It should be of type: { command: string; args?: any }`);
-		return;
-	}
-	session.customRequest(body.command, body.args).then(
-		resp	=> vscode.debug.activeDebugConsole.appendLine(JSON.stringify(resp, undefined, 2)),
-		error	=> vscode.window.showErrorMessage(error)
-	);
 }
 
 //-----------------------------------------------------------------------------

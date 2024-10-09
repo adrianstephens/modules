@@ -1,4 +1,4 @@
-//const vscode = acquireVsCodeApi();
+const vscode = acquireVsCodeApi();
 
 let sort_column = 0;
 let sort_direction = 1;
@@ -46,13 +46,13 @@ function getMarginAndBorder(element) {
 }
 
 function adjustPathWidths() {
-	const paths = document.querySelectorAll('.path-cell');
+	const paths = document.querySelectorAll('td.path');
 	const path_header = cols[paths[0].cellIndex];
 	if (max_path == 0) {
 		paths.forEach(cell => {
-			const dirSpan	   = cell.querySelector('.path-dir');
-			const filenameSpan  = cell.querySelector('.path-filename');
-			const cellWidth = dirSpan.scrollWidth + filenameSpan.scrollWidth;
+			const dirSpan		= cell.firstChild;//cell.querySelector('.path-dir');
+			const filenameSpan	= dirSpan.nextSibling;//cell.querySelector('.path-filename');
+			const cellWidth		= dirSpan.scrollWidth + filenameSpan.scrollWidth;
 			max_path = Math.max(max_path, cellWidth);
 		});
 
@@ -70,8 +70,10 @@ function adjustPathWidths() {
 		cellWidth = width - cellLeft - fudge;
   
 		paths.forEach(cell => {
-			const dirSpan	   = cell.querySelector('.path-dir');
-			const filenameSpan  = cell.querySelector('.path-filename');
+			const dirSpan		= cell.firstChild;//cell.querySelector('.path-dir');
+			const filenameSpan	= dirSpan.nextSibling;//cell.querySelector('.path-filename');
+			//const dirSpan		= cell.querySelector('.path-dir');
+			//const filenameSpan	= cell.querySelector('.path-filename');
 
 			cell.style.width = cell.style.maxWidth = `${cellWidth}px`;
 
@@ -85,9 +87,7 @@ function adjustPathWidths() {
 // Run on load and resize
 window.addEventListener('load', adjustPathWidths);
 window.addEventListener('resize', adjustPathWidths);
-const resizeObserver = new ResizeObserver(entries => {
-	adjustPathWidths();
-});
+const resizeObserver = new ResizeObserver(entries => adjustPathWidths());
 
 function sortTable(column) {
 	if (column === sort_column) {
@@ -123,6 +123,13 @@ cols.forEach((header,i) => {
 	});
 });
 
+table.querySelectorAll('tbody tr').forEach(row => row.addEventListener('click', event =>
+	vscode.postMessage({
+		command: event.target.matches('tr') ? 'click' : 'select',
+		id: row.id
+	})
+));
+
 window.addEventListener('message', event => {
 	switch (event.data.command) {
 		case 'set_text': {
@@ -133,5 +140,14 @@ window.addEventListener('message', event => {
 				console.log("didn't find" + event.data.id);
 			break;
 		}
+
+		case 'add_class':
+            document.querySelectorAll(event.data.selector).forEach(i => {
+                if (event.data.enable)
+                    i.classList.add(event.data.class);
+                else
+                    i.classList.remove(event.data.class);
+            });
+            break;
 	}
 });

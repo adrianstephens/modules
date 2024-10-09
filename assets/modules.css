@@ -57,61 +57,74 @@ th {
 	border-bottom: 1px solid var(--vscode-panel-border);
 	cursor: pointer;
 	user-select: none;
-}
 
-th.sort {
-	font-weight: bold;
-	&::before {
-		font-family: 'codicon';
-		content: '\eab4';
-	}
-	&.up::before {
-		content: '\eab7';
+	&.sort {
+		font-weight: bold;
+		&::before {
+			font-family: 'codicon';
+			content: '\eab4';
+		}
+		&.up::before {
+			content: '\eab7';
+		}
 	}
 }
 
 tr {
+	position: relative;
+	pointer-events: none;
 	background-color: var(--vscode-debugView-background);
-}
+	& > * {
+		pointer-events: auto;
+	}
 /*
-tr:nth-child(even) {
-	background-color: var(--vscode-list-hoverBackground);
-}
+	&:nth-child(even) {
+		background-color: var(--vscode-list-hoverBackground);
+	}
 */
-tr:hover {
-	background-color: var(--vscode-list-hoverBackground);
+	&:hover {
+		background-color: var(--vscode-list-hoverBackground);
+		&::after {
+			content: '\eae8';
+			font: normal normal normal 16px/1 codicon;
+			position: fixed;
+			right: 10px;
+			cursor: pointer;
+			pointer-events: all;
+			display: inline-block;
+		}
+	}
+	&.selected {
+		background-color: var(--vscode-list-activeSelectionBackground);
+		color: var(--vscode-list-activeSelectionForeground);
+	}
 }
 
-tr.selected {
-	background-color: var(--vscode-list-activeSelectionBackground);
-	color: var(--vscode-list-activeSelectionForeground);
-}
-
-.path-cell {
+td.path {
 	white-space: nowrap;
 	overflow: hidden;
 	position: relative;
-}
 
-.path-dir, .path-filename {
-	display: inline-block;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	vertical-align: bottom;
-}
+	&:hover::after {
+		content: attr(title);
+		position: absolute;
+		left: 0;
+		top: 100%;
+		background-color: var(--vscode-editor-background);
+		border: 1px solid var(--vscode-panel-border);
+		padding: 5px;
+		z-index: 1;
+		white-space: normal;
+		word-break: break-all;
+		max-width: 300px;
+	}
 
-.path-cell:hover::after {
-	content: attr(title);
-	position: absolute;
-	left: 0;
-	top: 100%;
-	background-color: var(--vscode-editor-background);
-	border: 1px solid var(--vscode-panel-border);
-	padding: 5px;
-	z-index: 1;
-	white-space: normal;
-	word-break: break-all;
-	max-width: 300px;
+	& span {
+		display: inline-block;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		vertical-align: bottom;
+	}
 }
 
 button.normal {

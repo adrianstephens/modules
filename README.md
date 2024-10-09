@@ -4,6 +4,10 @@ This extension provides a modules pane in the debug view, showing loaded modules
 
 ![alt text](assets/Screenshot.png)
 
+## What's New
+Um, it working? Just found out my package.json was skipping some file.
+Also, changed the icon.
+
 ## More Information
 As far as I can tell, this doesn't already exist, though some debugger extensions provide their own.
 

@@ -34,7 +34,7 @@ function getModuleAddress(session: vscode.DebugSession, frameId: number, m: Modu
 	return session.customRequest('evaluate', { 
 		expression: `((void*(*)(const char*))(${func}))("${m.name}")`,
 		frameId,
-		context: 	'watch'
+		context: 	'repl'
 	}).then(
 		resp => resp.memoryReference,
 		error => (console.log(error), undefined)
@@ -42,21 +42,24 @@ function getModuleAddress(session: vscode.DebugSession, frameId: number, m: Modu
 }
 
 
-async function getModuleAddressFunction(session: vscode.DebugSession, frameId: number) {
+async function getModuleAddressFunction(session: vscode.DebugSession, frameId: number) : Promise<string> {
 	let resp = await session.customRequest('evaluate', { 
 		expression: 'GetModuleHandleA',
 		frameId,
-		context: 	'watch'
+		context: 	'repl'
 	});
 	if (resp.memoryReference)
 		return resp.memoryReference;
+	
 	resp = await session.customRequest('evaluate', { 
 		expression: 'kernel32!GetModuleHandleA',
 		frameId,
-		context: 	'watch'
+		context: 	'repl'
 	});
 	if (resp.memoryReference)
 		return resp.memoryReference;
+
+	return '';
 }
 
 interface ColumnDescriptor {
@@ -71,14 +74,14 @@ function columnBoolean(b?: boolean) {
 const column_descriptors: Record<string, ColumnDescriptor> = {
 	id: 			{label:	'ID'},
 	name: 			{label: 'Name'},
-	addressRange:  	{label: 'Address',	html:	m => <td id={m.id+'-start'}>{m.addressRange ?? 'N/A'}</td>},
-	path:   		{label: 'Path',		html:	m => {
+	addressRange:  	{label: 'Address',		html:	m => <td class='address' id={m.id+'-start'}>{m.addressRange ?? 'N/A'}</td>},
+	path:   		{label: 'Path',			html:	m => {
 		const mod_path = m.path ?? '';
 		const directory = path.dirname(mod_path);
 		const filename = path.sep + path.basename(mod_path);
-		return <td class="path-cell" title={m.path}>
-			<span class="path-dir">{directory}</span>
-			<span class="path-filename">{filename}</span>
+		return <td class="path" title={m.path}>
+			<span>{directory}</span>
+			<span>{filename}</span>
 		</td>;
 	}},
 	isOptimized:   	{label: 'Optimized', 	html: m => columnBoolean(m.isOptimized)},
@@ -88,8 +91,32 @@ const column_descriptors: Record<string, ColumnDescriptor> = {
 	dateTimeStamp: 	{label: 'Time Stamp'},
 };
 
+const DEBUG_MEMORY_SCHEME = 'vscode-debug-memory';
+const getUriForDebugMemory = (
+	sessionId: string,
+	memoryReference: string,
+	range?: { fromOffset: number; toOffset: number },
+	displayName = 'memory'
+) => {
+	return vscode.Uri.from({
+		scheme: DEBUG_MEMORY_SCHEME,
+		authority: sessionId,
+		path: '/' + encodeURIComponent(memoryReference) + `/${encodeURIComponent(displayName)}.bin`,
+		query: range ? `?range=${range.fromOffset}:${range.toOffset}` : undefined,
+	});
+};
+
+function by_id(id: string | number) {
+	if (typeof id === 'number')
+		return `[id="${id}"]`;
+
+	id = id.replace(/[!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~]/g, "\\$&");
+	return id[0] >= '0' && id[0] <= '9' ? `[id="${id}"]` : `#${id}`;
+}
+
 export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode.DebugAdapterTracker {
 	private view?: vscode.WebviewView;
+	private receive?: vscode.Disposable;
 	private update	= new utils.CallCombiner(async () => {
 		if (this.view)
 			this.view.webview.html = this.updateView(Object.values(this.modules));
@@ -98,6 +125,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 	modules: Record<string, Module> = {};
 	address_function	= '';
 	address_requested	= new Set<Module>();
+	selected?: Module;
 
 	constructor(private context: vscode.ExtensionContext) {
 		const me = this;
@@ -110,6 +138,9 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 		
 	private setText(id: string, value:any) {
 		this.view?.webview.postMessage({command: 'set_text', id, value});
+	}
+	private addClass(selector: string, clss: string, enable:boolean) {
+		this.view?.webview.postMessage({command: 'add_class', selector, class: clss, enable});
 	}
 
 	private async fixModuleAddresses(session: vscode.DebugSession) {
@@ -134,10 +165,37 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 			enableScripts: true,
 			localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'assets')]
 		};
+
+		this.receive = webviewView.webview.onDidReceiveMessage(async message => {
+			switch (message.command) {
+				case 'select': {
+					const m = this.modules[message.id];
+					if (m !== this.selected) {
+						if (this.selected)
+							this.addClass(by_id(this.selected.id), 'selected', false);
+						this.selected = m;
+						this.addClass(by_id(m.id), 'selected', true);
+					}
+					break;
+				}
+				case 'click': {
+					const m = this.modules[message.id];
+					const session = vscode.debug.activeDebugSession;
+					if (session && m.addressRange) {
+						//vscode.commands.executeCommand('workbench.debug.viewlet.action.viewMemory', m.addressRange);
+						const uri = getUriForDebugMemory(session.id, m.addressRange, undefined, m.name);
+						await vscode.commands.executeCommand('vscode.openWith', uri, 'hexEditor.hexedit');
+					}
+					break;
+				}
+			}
+		});
+
 		this.update.trigger();
 	}
 
 	onWillStopSession(): void {
+		this.selected			= undefined;
 		this.address_requested.clear();
 		this.address_function	= '';
 		this.modules			= {};
@@ -157,7 +215,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 				case 'stackTrace':
 					//cppvsdbg doesn't return module addresses, so we do it by evaluating GetModuleHandleA
 					//other debuggers might need their own hacks
-					if (session && session.type === 'cppvsdbg')
+					if (session && (session.type === 'cppvsdbg' || session.type === 'cppdbg'))
 						this.fixModuleAddresses(session);
 					break;
 			}
@@ -214,7 +272,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 				<table>
 					{tableHead(cols, i => <th class={i==='id' ? 'sort' : undefined}>{column_descriptors[i].label}</th>)}
 					{tableBody(modules, m =>
-						<tr>{cols.map(i => column_descriptors[i].html ? column_descriptors[i].html(m) : <td>{m[i]}</td>)}</tr>
+						<tr id={m.id}>{cols.map(i => column_descriptors[i].html ? column_descriptors[i].html(m) : <td>{m[i]}</td>)}</tr>
 					)}
 				</table>
 				<script src={this.getUri("modules.js")}></script>

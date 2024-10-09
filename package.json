@@ -1,13 +1,22 @@
 {
 	"name": "modules",
-	"displayName": "Modules",
-	"description": "Modules display in Code's debugger",
+	"displayName": "Debug Modules",
+	"description": "Display loaded modules (dlls/dylibs) in the debugger",
+	"keywords": [
+		"debug",
+		"modules",
+		"loaded modules",
+		"module explorer",
+		"dll",
+		"dylib",
+		"dynamic library"
+	],
 	"icon": "assets/icon.png",
-	"version": "0.0.5",
+	"version": "0.0.6",
 	"publisher": "isopodlabs",
 	"repository": "https://github.com/adrianstephens/modules",
 	"files": [
-		"out/*",
+		"out/**/*",
 		"assets/*",
 		"LICENSE.txt"
 	],
