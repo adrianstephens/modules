@@ -2,7 +2,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as utils from "./modules/utils";
-import {DebugProtocol} from 'vscode-debugprotocol';
+import {DebugProtocol} from '@vscode/debugprotocol';
 import {jsx, fragment, codicons} from "./modules/jsx";
 
 //-----------------------------------------------------------------------------
