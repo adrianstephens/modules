@@ -1,12 +1,11 @@
 # Modules Debug Pane
 
-This extension provides a modules pane in the debug view, showing loaded modules (dlls)
+This extension provides a modules pane in the debug view, showing loaded modules (dlls), and/or loaded source files for languages like javascript.
 
 ![alt text](assets/Screenshot.png)
 
 ## What's New
-Um, it working? Just found out my package.json was skipping some file.
-Also, changed the icon.
+Javascript debuggers don't have modules, but they do have 'loadedSource' events which are sort-of analogous. In this update I add Source objects to the modules pane, so you can tell what files the javascript runtime has loaded in the course of execution, and sort and open them.
 
 ## More Information
 As far as I can tell, this doesn't already exist, though some debugger extensions provide their own.

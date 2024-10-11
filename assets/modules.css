@@ -70,7 +70,7 @@ th {
 	}
 }
 
-tr {
+tbody tr {
 	position: relative;
 	pointer-events: none;
 	background-color: var(--vscode-debugView-background);
@@ -87,8 +87,13 @@ tr {
 		&::after {
 			content: '\eae8';
 			font: normal normal normal 16px/1 codicon;
-			position: fixed;
-			right: 10px;
+			background-color: var(--vscode-list-hoverBackground);
+			position: sticky;
+			right: 0;
+			width: 20px;
+			height: 100%;
+			text-align: center;
+			vertical-align: middle;
 			cursor: pointer;
 			pointer-events: all;
 			display: inline-block;
@@ -101,9 +106,9 @@ tr {
 }
 
 td.path {
-	white-space: nowrap;
-	overflow: hidden;
 	position: relative;
+	padding-right: 0;
+	text-overflow:initial;
 
 	&:hover::after {
 		content: attr(title);
@@ -119,7 +124,7 @@ td.path {
 		max-width: 300px;
 	}
 
-	& span {
+	& > span {
 		display: inline-block;
 		overflow: hidden;
 		text-overflow: ellipsis;

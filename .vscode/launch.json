@@ -10,31 +10,25 @@
 			"type": "extensionHost",
 			"request": "launch",
 			"runtimeExecutable": "${execPath}",
-			"args": [
-				"--trace-deprecation",
-				"--extensionDevelopmentPath=${workspaceFolder}",
-				"D:\\dev\\shared\\"
-			],
 			"outFiles": [
 				"${workspaceFolder}/out/**/*.js",
-				"E:/Github/vscode/out/**/*.js",
-			],
-			"sourceMaps": true,
-			"preLaunchTask": "npm: watch"
-		},
-		{
-			"name": "Run Extension (Mac)",
-			"type": "extensionHost",
-			"request": "launch",
-			"args": [
-				"--extensionDevelopmentPath=${workspaceFolder}",
-				"/Volumes/DevSSD/dev/shared"
-			],
-			"outFiles": [
-				"${workspaceFolder}/out/**/*.js"
 			],
 			"sourceMaps": true,
 			"preLaunchTask": "npm: watch",
-		},
+			"windows": {
+				"args": [
+					"--trace-deprecation",
+					"--extensionDevelopmentPath=${workspaceFolder}",
+					//"D:\\dev\\shared\\"
+					"D:\\dev\\vscode_ext\\registry"
+				],
+			},
+			"osx": {
+				"args": [
+					"--extensionDevelopmentPath=${workspaceFolder}",
+					"/Volumes/DevSSD/dev/shared"
+				],
+			},
+		}
 	]
 }
