@@ -21,13 +21,27 @@ export class AsyncLazy<T> {
 	}
 }
 
-export class CallCombiner {
+export class CallCombiner0 {
 	private timeout:	ReturnType<typeof setTimeout> | null = null;
-	constructor(public func:()=>void, public delay:number) {}
-	trigger() {
+
+	combine(delay:number, func:()=>void) {
 		if (this.timeout)
 			clearTimeout(this.timeout);
-		this.timeout = setTimeout(this.func, this.delay);
+		this.timeout = setTimeout(()=> {
+			this.timeout = null;
+			func()
+		}, delay);
+	}
+	pending() : boolean {
+		return !!this.timeout;
+	}
+}
+export class CallCombiner extends CallCombiner0 {
+	constructor(private func:()=>void, private delay:number) {
+		super();
+	}
+	trigger() {
+		super.combine(this.delay, this.func);
 	}
 }
 
@@ -84,7 +98,11 @@ export function partition<T, U extends keyof any | boolean>(array: Iterable<T>, 
 	return partitions;
 }
 
- //-----------------------------------------------------------------------------
+export function isEmpty(obj: object) : boolean {
+	return Object.keys(obj).length === 0;
+}
+
+//-----------------------------------------------------------------------------
 //	iterator
 //-----------------------------------------------------------------------------
 
@@ -298,8 +316,39 @@ export function tag(strings: TemplateStringsArray, ...keys: any[]) {
 }
 
 //-----------------------------------------------------------------------------
-//	text
+//	text/binary
 //-----------------------------------------------------------------------------
+
+interface array_buffer {
+	buffer:			ArrayBuffer;
+	byteLength:		number;
+	byteOffset:		number;
+	slice(begin:	number, end?: number): array_buffer;
+}
+
+export function to8(arg: array_buffer) : Uint8Array;
+export function to8(arg?: array_buffer) : Uint8Array|undefined;
+export function to8(arg?: array_buffer) {
+	return arg && new Uint8Array(arg.buffer, arg.byteOffset, arg.byteLength);
+}
+
+export function to16(arg: array_buffer) : Uint16Array;
+export function to16(arg?: array_buffer) : Uint16Array|undefined;
+export function to16(arg?: array_buffer) {
+	return arg && new Uint16Array(arg.buffer, arg.byteOffset, arg.byteLength / 2);
+}
+
+export function to32(arg: array_buffer) : Uint32Array;
+export function to32(arg?: array_buffer) : Uint32Array|undefined;
+export function to32(arg?: array_buffer) {
+	return arg && new Uint32Array(arg.buffer, arg.byteOffset, arg.byteLength / 4);
+}
+
+export function to64(arg: array_buffer) : BigUint64Array;
+export function to64(arg?: array_buffer) : BigUint64Array|undefined;
+export function to64(arg?: array_buffer) {
+	return arg && new BigUint64Array(arg.buffer, arg.byteOffset, arg.byteLength / 8);
+}
 
 export type TextEncoding = 'utf8' | 'utf16le' | 'utf16be';
 
@@ -319,7 +368,7 @@ function _encodeText16Into(str: string, into: Uint8Array, encoding: TextEncoding
 
 	} else {
 		const len	= str.length;
-		const view	= new Uint16Array(into.buffer, into.byteOffset, into.byteLength / 2);
+		const view	= to16(into);
 		for (let i = 0; i < len; i++)
 			view[i] = str.charCodeAt(i);
 
@@ -357,11 +406,15 @@ export function decodeText(buf: Uint8Array, encoding: TextEncoding): string {
 	if ((encoding === 'utf16be') === isLittleEndian)
 		byteSwap(buf);
 
-	const view	= new Uint16Array(buf.buffer, buf.byteOffset, buf.byteLength / 2);
+	const view	= to16(buf);
 	let result = '';
 	for (let i = view[0] === 0xfeff ? 1 : 0; i < view.length; i += 1024)
 		result += String.fromCharCode(...view.subarray(i, i + 1024));
 	return result;
+}
+
+export function decodeText0(buf: Uint8Array|undefined, encoding: TextEncoding): string {
+	return buf ? decodeText(buf.subarray(0, encoding === 'utf8' ? buf.indexOf(0) : to16(buf).indexOf(0) * 2), encoding) : '';
 }
 
 export function getTextEncoding(bytes: Uint8Array): TextEncoding {
@@ -371,4 +424,66 @@ export function getTextEncoding(bytes: Uint8Array): TextEncoding {
 		:	bytes.length >= 2 && bytes[0] === 0 && bytes[1] !== 0 ? 'utf16be'
 		:	bytes.length >= 2 && bytes[0] !== 0 && bytes[1] === 0 ? 'utf16le'
 		: 	'utf8';
+}
+
+export function getBigInt(dv: DataView, len: number, littleEndian?: boolean) {
+	let result = 0n;
+	if (littleEndian) {
+		let offset = len;
+		while (offset >= 4) {
+			offset -= 4;
+			result = (result << 32n) | BigInt(dv.getUint32(offset, true));
+		}
+		if (len & 2) {
+			offset -= 2;
+			result = (result << 16n) | BigInt(dv.getUint16(offset, true));
+		}
+		if (len & 1)
+			result |= (result << 8n) | BigInt(dv.getUint8(--offset));
+	} else {
+		let offset = 0;
+		while (offset + 4 <= len) {
+			result = (result << 32n) | BigInt(dv.getUint32(offset));
+			offset += 4;
+		}
+		if (len & 2) {
+			result = (result << 16n) | BigInt(dv.getUint16(offset));
+			offset += 2;
+		}
+		if (len & 1)
+			result |= (result << 8n) | BigInt(dv.getUint8(offset));
+	}
+	return result;
+}
+
+export function putBigInt(dv: DataView, v: bigint, len: number, littleEndian?: boolean) {
+	if (littleEndian) {
+		let offset = 0;
+		while (offset + 4 <= len) {
+			dv.setUint32(offset, Number(v & 0xffffffffn), true);
+			v >>= 32n;
+			offset += 4;
+		}
+		if (len & 2) {
+			dv.setUint32(offset, Number(v & 0xffffn), true);
+			v >>= 16n;
+			offset += 2;
+		}
+		if (len & 1)
+			dv.setUint8(offset, Number(v & 0xffn));
+	} else {
+		let offset = len;
+		while (offset >= 4) {
+			offset -= 4;
+			dv.setUint32(offset, Number(v & 0xffffffffn));
+			v >>= 32n;
+		}
+		if (len & 2) {
+			offset -= 2;
+			dv.setUint16(offset, Number(v & 0xffffn));
+			v >>= 16n;
+		}
+		if (len & 1)
+			dv.setUint8(--offset, Number(v & 0xffn));
+	}
 }

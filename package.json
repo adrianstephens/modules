@@ -16,8 +16,9 @@
 	"publisher": "isopodlabs",
 	"repository": "https://github.com/adrianstephens/modules",
 	"files": [
-		"out/**/*",
+		"out/**/*.js",
 		"assets/*",
+		"!assets/*.psd",
 		"LICENSE.txt"
 	],
 	"engines": {
@@ -29,8 +30,27 @@
 	],
 	"activationEvents": [],
 	"main": "./out/extension.js",
-	"contributes": {
-		"views": {
+    "contributes": {
+        "customEditors": [
+            {
+                "viewType": "modules.dllView",
+                "displayName": "DLL Viewer",
+                "selector": [
+                    {"filenamePattern": "*.dll"},
+                    {"filenamePattern": "*.exe"}
+                ]
+            },
+            {
+                "viewType": "hex.view",
+                "displayName": "Hex Viewer",
+                "selector": [
+                    {"filenamePattern": "*"}
+                ],
+                "priority": "option"
+            }
+        ],
+
+        "views": {
 			"debug": [
 				{
 					"id": "modules-view",
@@ -39,13 +59,87 @@
 				}
 			]
 		},
+
 		"commands": [
 			{
 				"command": "modules.sendDAPRequest",
 				"title": "Send DAP Request"
-			}
-		]
+			},
+            {
+				"command": "hex.reopen",
+				"title": "Reopen in Hex"
+			},
+            {   
+                "command": "hex.bytesPerLine",
+				"title": "Bytes per Line"
+            },
+            {
+                "command": "hex.radix",
+                "title": "Radix"
+            },
+            {
+                "command": "hex.copy_hex",
+                "title": "Copy hex"
+            },
+            {
+                "command": "hex.copy_ascii",
+                "title": "Copy ascii"
+            }
+		],
+
+        "keybindings":[
+            { "command": "hex.copy_hex",    "key": "ctrl+c"}
+        ],
+
+        "submenus": [
+            {
+                "id": "hex.options",
+                "label": "Hex Options",
+                "icon": "$(settings)"
+            }
+        ],
+
+        "menus": {
+            "editor/title": [
+                {
+                    "submenu": "hex.options",
+                    "when": "activeCustomEditorId == hex.view",
+                    "group": "navigation"
+                }
+            ],
+            "hex.options": [
+                { "command": "hex.bytesPerLine"},
+                { "command": "hex.radix"}
+            ],
+            "webview/context": [
+                {
+                    "command": "hex.copy_hex",
+                    "when": "webviewId == 'hex.view' && selection && section=='hex'"
+                },
+                {
+                    "command": "hex.copy_ascii",
+                    "when": "webviewId == 'hex.view' && selection && section=='ascii'"
+                },
+                {
+                    "command": "hex.bytesPerLine",
+                    "when": "webviewId == 'hex.view'"
+                },
+                {
+                    "command": "hex.radix",
+                    "when": "webviewId == 'hex.view'"
+                }
+            ]
+        }
 	},
+
+    "scripts_webpack": {
+        "vscode:prepublish": "npm run package",
+        "compile": "webpack",
+        "watch": "webpack --watch",
+        "package": "webpack --mode production --devtool hidden-source-map",
+        "test-compile": "tsc -p ./",
+		"publish": "vsce publish patch"
+    },
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
 		"compile": "tsc -p ./",
@@ -60,6 +154,12 @@
 		"@typescript-eslint/parser": "^7.14.0",
 		"@vscode/codicons": "^0.0.20",
 		"@vscode/debugprotocol": "^1.51.0",
-		"eslint": "^8.26.0"
+		"eslint": "^8.26.0",
+		"ts-loader": "^9.5.1",
+		"webpack": "^5.95.0",
+		"webpack-cli": "^5.1.4"
+	},
+	"dependencies": {
+		"@vscode/extension-telemetry": "^0.9.7"
 	}
 }

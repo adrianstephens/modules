@@ -19,8 +19,8 @@
 				"args": [
 					"--trace-deprecation",
 					"--extensionDevelopmentPath=${workspaceFolder}",
-					//"D:\\dev\\shared\\"
-					"D:\\dev\\vscode_ext\\registry"
+					"D:\\dev\\shared\\"
+					//"D:\\dev\\vscode_ext\\registry"
 				],
 			},
 			"osx": {
@@ -29,6 +29,13 @@
 					"/Volumes/DevSSD/dev/shared"
 				],
 			},
-		}
+		},
+        {
+            "type": "msedge",
+            "request": "launch",
+            "name": "Run extension in edge",
+            "url": "https://vscode.dev",
+            "webRoot": "${workspaceFolder}"
+        }
 	]
 }

@@ -25,18 +25,18 @@ function replace(text, re, process) {
 }
 
 function replace_in_element(e, re, process) {
-    if (e.id)
-        e.id = replace(e.id, re, process);
-    if (e.attributes.name)
-        e.attributes.name.value = replace(e.attributes.name.value, re, process);
-    const childNodes = e.childNodes;
-    for (let i = 0; i < childNodes.length; i++) {
-        const node = childNodes[i];
-        if (node.nodeType === window.Node.TEXT_NODE)
-            node.textContent = replace(node.textContent, re, process);
-        else if (node.nodeType === window.Node.ELEMENT_NODE)
-            replace_in_element(node, re, process);
-    }
+	if (e.id)
+		e.id = replace(e.id, re, process);
+	if (e.attributes.name)
+		e.attributes.name.value = replace(e.attributes.name.value, re, process);
+	const childNodes = e.childNodes;
+	for (let i = 0; i < childNodes.length; i++) {
+		const node = childNodes[i];
+		if (node.nodeType === window.Node.TEXT_NODE)
+			node.textContent = replace(node.textContent, re, process);
+		else if (node.nodeType === window.Node.ELEMENT_NODE)
+			replace_in_element(node, re, process);
+	}
 }
 
 function template(template, parent, values) {
@@ -133,10 +133,11 @@ function sortTable(column) {
 	const type = cols[column].dataset.type;
 
 	const tbody = table.querySelector('tbody');
-	const rows = Array.from(tbody.querySelectorAll('tr'));
+	const rows	= Array.from(tbody.querySelectorAll('tr'));
 
-	const compare	= type === 'number' ? (a, b) => parseInt(a) - parseInt(b)
-					: (a, b) => a.localeCompare(b);
+	const compare	= type === 'number'
+		? (a, b) => parseInt(a) - parseInt(b)
+		: (a, b) => a.localeCompare(b);
 
 	rows.sort((a, b) => compare(a.childNodes[column].textContent, b.childNodes[column].textContent) * sort_direction);
 
@@ -159,6 +160,14 @@ table.querySelectorAll('tbody tr').forEach(row => row.addEventListener('click', 
 	})
 ));
 
+table.querySelectorAll('td.path').forEach(path => path.addEventListener('click', event =>
+	vscode.postMessage({
+		command: 'open',
+		path: path.getAttribute("title")
+	})
+));
+
+
 window.addEventListener('message', event => {
 	switch (event.data.command) {
 		case 'set_text': {
@@ -171,13 +180,13 @@ window.addEventListener('message', event => {
 		}
 
 		case 'add_class':
-            document.querySelectorAll(event.data.selector).forEach(i => {
-                if (event.data.enable)
-                    i.classList.add(event.data.class);
-                else
-                    i.classList.remove(event.data.class);
-            });
-            break;
+			document.querySelectorAll(event.data.selector).forEach(i => {
+				if (event.data.enable)
+					i.classList.add(event.data.class);
+				else
+					i.classList.remove(event.data.class);
+			});
+			break;
 
 		case 'add_item': {
 			const t = document.getElementById(event.data.template);

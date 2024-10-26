@@ -4,6 +4,8 @@ import * as path from "path";
 import * as utils from "./modules/utils";
 import {DebugProtocol} from '@vscode/debugprotocol';
 import {jsx, fragment, codicons} from "./modules/jsx";
+import * as telemetry from "./telemetry";
+import {bad_reporter} from "./extension";
 
 //-----------------------------------------------------------------------------
 //	ModuleViewProvider
@@ -19,31 +21,35 @@ interface ColumnDescriptor {
 	html?: 		(m: Module)=>string;
 }
 
-function columnBoolean(b?: boolean) {
-	return <td>{b == undefined ? '?' : b ? 'Yes' : 'No'}</td>;
+function descriptorBoolean(label: string, id: string) : ColumnDescriptor {
+	return {label, type: 'boolean', html: m => <td>{m[id] == undefined ? '?' : m[id] ? 'Yes' : 'No'}</td>};
 }
-function columnAddress(m: Module, address?: string) {
-	return <td id={m.id+'-start'}>{address ?? 'N/A'}</td>;
+function descriptorAddress(label: string, id: string) : ColumnDescriptor {
+	return {label, type: 'number', html: m => <td id={m.id+'-start'}>{m[id] ?? 'N/A'}</td>};
 }
-function columnPath(filename: string) {
-	return <td class="path" title={filename}>
-		<span>{path.dirname(filename)}</span>
-		<span>{path.sep + path.basename(filename)}</span>
-	</td>;
+function descriptorPath(label: string, id: string) : ColumnDescriptor {
+	return {label, type: 'path', html: m => {
+		const filename = m[id] ?? '';
+		return <td class="path" title={filename}>
+			<span>{path.dirname(filename)}</span>
+			<span>{path.sep + path.basename(filename)}</span>
+		</td>;
+	}};
 }
+
 
 const column_descriptors: Record<string, ColumnDescriptor> = {
 //	id: 			{label:	'ID', 		type: 'number'},
 	vsLoadOrder:	{label: 'Order',		type: 'number'},
 	name: 			{label: 'Name',								html: m => <td>{path.basename(m.name)}</td>},
-	addressRange:  	{label: 'Address',		type: 'number',		html: m => columnAddress(m, m.addressRange)},
-	vsLoadAddress: 	{label: "Address",		type: 'number',		html: m => columnAddress(m, m.vsLoadAddress)},
+	addressRange:  	descriptorAddress('Address', 'addressRange'),
+	vsLoadAddress: 	descriptorAddress("Address", 'vsLoadAddress'),
 	vsModuleSize: 	{label: "Size",			type: 'number'},
-	path:   		{label: 'Path',			type: 'path',		html: m => columnPath(m.path ?? '')},
-	vsIs64Bit: 		{label: "64 Bit", 		type: 'boolean',	html: m => columnBoolean(m.vsIs64Bit)},
-	isOptimized:   	{label: 'Optimized',	type: 'boolean', 	html: m => columnBoolean(m.isOptimized)},
-	isUserCode: 	{label: 'User Code',	type: 'boolean', 	html: m => columnBoolean(m.isUserCode)},
-	version:    	{label: 'Version'},
+	path:   		descriptorPath('Path', 'path'),
+	vsIs64Bit: 		descriptorBoolean("64 Bit", 'vsIs64Bit'),
+	isOptimized:   	descriptorBoolean('Optimized', 'isOptimized'),
+	isUserCode: 	descriptorBoolean('User Code', 'isUserCode'),
+	version:		{label: 'Version'},
 	symbolFilePath:	{label: 'Symbols',							html: m => <td>{m.symbolFilePath ?? m.symbolStatus}</td>},
 	dateTimeStamp: 	{label: 'Time Stamp',	type: 'time'},
 	vsTimestampUTC: {label: 'Time Stamp',	type: 'time',		html: m => <td>{new Date(m.vsTimestampUTC * 1000).toUTCString()}</td>},
@@ -92,7 +98,7 @@ const getUriForDebugMemory = (
 	return vscode.Uri.from({
 		scheme: DEBUG_MEMORY_SCHEME,
 		authority: sessionId,
-		path: '/' + encodeURIComponent(memoryReference) + `/${encodeURIComponent(displayName)}.bin`,
+		path: '/' + encodeURIComponent(memoryReference) + `/${encodeURIComponent(displayName)}`,
 		query: range ? `?range=${range.fromOffset}:${range.toOffset}` : undefined,
 	});
 };
@@ -146,6 +152,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 		if (this.view)
 			this.view.webview.html = this.updateView();
 	}, 100);
+	private tele    = new utils.CallCombiner0;
 
 	modules: Record<string, Module> = {};
 	address_function	= '';
@@ -156,10 +163,10 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 	constructor(private context: vscode.ExtensionContext) {
 		const me = this;
 		vscode.debug.registerDebugAdapterTrackerFactory('*', {
-            createDebugAdapterTracker(session: vscode.DebugSession) {
-                return me;
-            }
-        });
+			createDebugAdapterTracker(session: vscode.DebugSession) {
+				return me;
+			}
+		});
 		vscode.workspace.registerTextDocumentContentProvider(DEBUG_SOURCE_SCHEME, new DebugSourceTextProvider);
 	}
 
@@ -215,7 +222,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 					if (session && m.addressRange) {
 						//vscode.commands.executeCommand('workbench.debug.viewlet.action.viewMemory', m.addressRange);
 						const uri = getUriForDebugMemory(session.id, m.addressRange, undefined, m.name);
-						await vscode.commands.executeCommand('vscode.openWith', uri, 'hexEditor.hexedit');
+						await vscode.commands.executeCommand('vscode.openWith', uri, 'hexEditor.hexedit', {preview: true});
 					} else if (session && m.sourceReference) {
 						openPreview(getUriForDebugSource(session.id, m.sourceReference, path.extname(m.name) ? m.name : m.name + '.js'));
 					} else if (m.path) {
@@ -223,6 +230,12 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 					}
 					break;
 				}
+				case 'open': {
+                    console.log(message);
+                    vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.path));
+                    break;
+                }
+
 			}
 		});
 
@@ -300,15 +313,22 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 
 	updateView() : string {
 		const	modules = Object.values(this.modules);
-		if (modules.length == 0)
+		if (modules.length == 0) {
+			const type = vscode.debug.activeDebugSession?.type;
+			if (type)
+				telemetry.send('view.none', {type});
+
 			return `<!DOCTYPE html>`+
 			<html lang="en">
 				<body>
 					No Modules
 				</body>
 			</html>;
+		}
 
 		const has_col	= modules.reduce((cols, m) => (Object.keys(m).forEach(k => cols.add(k)), cols), new Set<string>());
+
+        this.tele.combine(1000, () => telemetry.send('view.update', {type: vscode.debug.activeDebugSession?.type || 'unknown', cols: Array.from(has_col.keys()).join(', '), rows: modules.length}));
 
 		if (has_col.has('vsLoadAddress')) {
 			has_col.delete('vsLoadAddress');
@@ -325,7 +345,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 
 		const cols		= Object.keys(column_descriptors).filter(k => has_col.has(k));
 
-		return `<!DOCTYPE html>`+
+		return '<!DOCTYPE html>' +
 			<html lang="en">
 				<head>
 					<meta charset="UTF-8"/>

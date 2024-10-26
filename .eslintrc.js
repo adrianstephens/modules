@@ -11,7 +11,6 @@ module.exports = {
 		'plugin:@typescript-eslint/recommended',
 	],
 	rules: {
-		'semi': [2, "always"],
 		'@typescript-eslint/no-misleading-character-class': 0,
 		'@typescript-eslint/no-this-alias': 0,
 		'@typescript-eslint/no-unused-vars': 0,

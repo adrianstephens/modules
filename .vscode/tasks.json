@@ -21,9 +21,7 @@
             "label": "prepublish",
             "command": "git add . & if not ${input:version}==none npm version ${input:version} --force",
             "problemMatcher": [],
-            "dependsOn": [
-                "npm: compile"
-            ]
+            "dependsOn": "npm: compile"
         },
         {
             "type": "shell",
@@ -31,6 +29,12 @@
             "command": "vsce publish",
             "problemMatcher": [],
             "dependsOn": "prepublish"
+        },
+        {
+            "type": "shell",
+            "label": "PACKAGE",
+            "command": "node E:\\Github\\vscode-vsce\\vsce package",
+            "problemMatcher": []
         }
 
 	],

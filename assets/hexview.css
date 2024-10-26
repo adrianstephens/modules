@@ -1,0 +1,212 @@
+body {
+    margin: 0;
+    padding: 0;
+    /*width: 100vw;
+    height: 100vh;*/
+    overflow: hidden;
+    user-select: none;
+    --row-height: 20px;
+    --digit-width: 10px;
+    --digits: 2;
+    --num-columns: 16;
+}
+
+.container {
+    overflow-x: hidden;
+    overflow-y: scroll;
+    width: calc(100vw + 15px);
+    height: 100vh;
+}
+
+.hexview {
+    position:   relative;
+    display:    flex;
+    overflow:   hidden;
+    column-gap: 10px;
+    font-family: var(--vscode-editor-font-family);
+    font-size: var(--vscode-editor-font-size);
+    color: var(--vscode-foreground);
+
+    &::before {
+        content: '';
+        position: absolute;
+        left:   0;
+        top:    0;
+        width:  100%;
+        height: inherit;
+        background-color: var(--vscode-list-hoverBackground);
+        mask:       url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 2"%3E%3Crect width="1" height="1" fill="currentColor"/%3E%3C/svg%3E') repeat;
+        mask-size:  var(--row-height);
+        z-index:    -1;
+    }
+}
+
+.data {
+    display: contents;
+    text-align:right;
+}
+
+.placeholder {
+    display: contents;
+    & span {
+        visibility: hidden;
+    }
+}
+
+.addr {
+    width: auto;
+    overflow: hidden;
+    display: grid;
+    grid-auto-rows: var(--row-height);
+
+    & span {
+        color: var(--vscode-editorLineNumber-foreground);
+        &:hover {
+            background-color: var(--vscode-editor-hoverHighlightBackground);
+        }
+    
+    }
+}
+
+.hex {
+    flex: var(--digits);
+    /*height: 100vh;*/
+    overflow: hidden;
+    position: relative;
+    scrollbar-width: none;
+
+    --width: calc(var(--digits) * var(--digit-width));
+    display: grid;
+    grid-template-columns: repeat(var(--num-columns), var(--width));
+    grid-auto-rows: var(--row-height);
+
+    & .placeholder span::before {
+        visibility: visible;
+        content: '--';
+    }
+
+    & span:hover {
+        position: relative;
+
+        &::after {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: 0px;
+            right: -5px;
+            bottom: -5px;
+	        border: 2px solid var(--vscode-editorHoverWidget-border);
+            border-radius: 10px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+    }
+}
+
+.ascii {
+    flex: 1;
+    /*overflow: hidden;*/
+    position: relative;
+
+    --width: var(--digit-width);
+    display: grid;
+    grid-template-columns: repeat(var(--num-columns), var(--digit-width));
+    grid-auto-rows: var(--row-height);
+
+    & .placeholder span::before {
+        visibility: visible;
+        content: '.';
+    }
+
+    & span:hover {
+        background-color: var(--vscode-editor-hoverHighlightBackground);
+    }
+}
+
+.selection {
+    position: absolute;
+    background-color: var(--vscode-editor-selectionBackground);
+    pointer-events: none;
+    z-index: -1;
+
+    &[data-multi-row="false"] {
+        top:    calc(var(--start-y) * var(--row-height));
+        height: var(--row-height);
+        left:   calc(var(--start-x) * var(--width));
+        width:  calc((var(--end-x) - var(--start-x)) * var(--width));
+    }
+
+    &[data-multi-row="true"] {
+        top:    calc((var(--start-y) + 1) * var(--row-height));
+        height: calc((var(--end-y) - var(--start-y) - 1) * var(--row-height));
+        width:  calc(var(--width) * var(--num-columns));
+
+        &::before, &::after {
+            content: '';
+            position: absolute;
+            background-color: inherit;
+            pointer-events: inherit;
+            height: var(--row-height);
+        }
+        &::before {
+            top: calc(-1 * var(--row-height));
+            left: calc(var(--start-x) * var(--width));
+            width: calc(var(--width) * (var(--num-columns) - var(--start-x)));
+
+        }
+        &::after {
+            bottom: calc(-1 * var(--row-height));
+            width: calc(var(--end-x) * var(--width));
+        }
+    }
+}
+
+#tooltip {
+	position: absolute;
+    display:    none;
+    padding:    .5em;
+    z-index:    1000;
+	overflow:   hidden;
+	background: var(--vscode-editorHoverWidget-background);
+	color:      var(--vscode-editorHoverWidget-foreground);
+	border:     1px solid var(--vscode-editorHoverWidget-border);
+	border-radius: 3px;
+	box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+    white-space: pre-wrap;
+    pointer-events: none;
+}
+
+.vscrollbar, .hscrollbar {
+	position: fixed;
+ 
+    background: transparent;
+    opacity: 1;
+    transition: opacity .4s linear;
+    z-index: 11;
+
+    background: var(--vscode-scrollbarSlider-background);
+
+    &:hover {
+        background: var(--vscode-scrollbarSlider-hoverBackground);
+    }
+    &.active {
+        background: var(--vscode-scrollbarSlider-activeBackground)
+    }
+
+    &.invisible {
+        opacity: 0;
+        transition: opacity .8s linear;
+        pointer-events: none;
+    }
+}
+
+.vscrollbar {
+    right: 0;
+    width: 14px;
+}
+
+.hscrollbar {
+    bottom: 0;
+    height: 14px;
+}

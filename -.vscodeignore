@@ -1,0 +1,17 @@
+# Ignore everything by default
+**/*
+
+# Then explicitly include what you want
+!dist/**/*.js
+!assets/**
+!LICENSE.txt
+!README.md
+!package.json
+
+# Exclude specific files
+assets/icon.psd
+**/assets/icon.psd
+**/*.psd
+**/*.PSD
+*.psd
+*.PSD

@@ -110,18 +110,23 @@ td.path {
 	padding-right: 0;
 	text-overflow:initial;
 
-	&:hover::after {
-		content: attr(title);
-		position: absolute;
-		left: 0;
-		top: 100%;
-		background-color: var(--vscode-editor-background);
-		border: 1px solid var(--vscode-panel-border);
-		padding: 5px;
-		z-index: 1;
-		white-space: normal;
-		word-break: break-all;
-		max-width: 300px;
+	&:hover {
+        & > span {
+            text-decoration: underline;
+        }
+        &::after {
+            content: attr(title);
+            position: absolute;
+            left: 0;
+            top: 100%;
+            background-color: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            padding: 5px;
+            z-index: 1;
+            white-space: normal;
+            word-break: break-all;
+            max-width: 300px;
+        }
 	}
 
 	& > span {

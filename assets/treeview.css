@@ -1,0 +1,71 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, 'Ubuntu', 'Droid Sans', sans-serif;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--vscode-foreground);
+    margin: 0;
+    --depth: 0;
+    --depth2: 0;
+}
+
+.codicon {
+	font: normal normal normal 16px/1 codicon;
+	display: inline-block;
+	text-decoration: none;
+	text-rendering: auto;
+	text-align: center;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	user-select: none;
+	-webkit-user-select: none;
+	-ms-user-select: none;
+    margin-right: 4px;
+}
+
+.tree {
+    white-space: nowrap;
+    z-index: 1;
+}
+
+.children {
+    --depth2: var(--depth);
+}
+
+.caret {
+    --depth: calc(var(--depth2) + 1);
+    cursor: pointer;
+    user-select: none;
+
+    & > span::before {
+        font-family: 'codicon';
+        content: '\eab6';
+        display: inline-block;
+        margin-right: 6px;
+    }
+
+    &.caret-down > span {
+        position: sticky;
+        top: calc((var(--depth) - 1) * 20px);
+        background-color: var(--vscode-editor-background);
+        z-index: calc(1000 - var(--depth));
+        display: inline-block;
+        width: 100%;
+
+        &::before {
+            font-family: 'codicon';
+            content: '\eab4';
+        }
+    }
+
+    & > div {
+        padding-left: 20px;
+    }
+}
+
+.stuck {
+    box-shadow: var(--vscode-sideBarStickyScroll-shadow) 0 6px 6px -6px;
+}
+
+.caret:not(.caret-down) div {
+    display: none;
+}
