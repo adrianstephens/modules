@@ -1,9 +1,3 @@
 [submodule "src/shared"]
 	path = src/shared
 	url = https://github.com/adrianstephens/ts-shared.git
-[submodule "src/xml"]
-	path = src/xml
-	url = https://github.com/adrianstephens/ts-xml.git
-[submodule "src/registry"]
-	path = src/registry
-	url = https://github.com/adrianstephens/ts-registry.git
