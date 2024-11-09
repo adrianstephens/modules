@@ -30,27 +30,28 @@
 	],
 	"activationEvents": [],
 	"main": "./out/extension.js",
-    "contributes": {
-        "customEditors": [
-            {
-                "viewType": "modules.dllView",
-                "displayName": "DLL Viewer",
-                "selector": [
-                    {"filenamePattern": "*.dll"},
-                    {"filenamePattern": "*.exe"}
-                ]
-            },
-            {
-                "viewType": "hex.view",
-                "displayName": "Hex Viewer",
-                "selector": [
-                    {"filenamePattern": "*"}
-                ],
-                "priority": "option"
-            }
-        ],
 
-        "views": {
+	"contributes": {
+		"customEditors": [
+			{
+				"viewType": "modules.dllView",
+				"displayName": "DLL Viewer",
+				"selector": [
+					{"filenamePattern": "*.dll"},
+					{"filenamePattern": "*.exe"}
+				]
+			},
+			{
+				"viewType": "hex.view",
+				"displayName": "Hex Viewer",
+				"selector": [
+					{"filenamePattern": "*"}
+				],
+				"priority": "option"
+			}
+		],
+
+		"views": {
 			"debug": [
 				{
 					"id": "modules-view",
@@ -65,81 +66,123 @@
 				"command": "modules.sendDAPRequest",
 				"title": "Send DAP Request"
 			},
-            {
-				"command": "hex.reopen",
-				"title": "Reopen in Hex"
+			{
+				"command": "hex.open",
+				"title": "Open in Hex"
 			},
-            {   
-                "command": "hex.bytesPerLine",
-				"title": "Bytes per Line"
+			{
+				"command": "hex.reopen",
+				"title": "Reopen in Hex",
+                "icon": "$(file-binary)"
+			},
+			{   
+				"command": "hex.bytesPerLine",
+				"title": "Columns"
+			},
+			{
+				"command": "hex.radix",
+				"title": "Radix"
+			},
+			{
+				"command": "hex.text",
+				"title": "Text"
+			},
+			{
+				"command": "hex.copy_hex",
+				"title": "Copy hex"
+			},
+			{
+				"command": "hex.copy_text",
+				"title": "Copy text"
+			},
+			{
+				"command": "hex.goto",
+				"title": "Goto..."
+			},
+			{	"command": "hex.addHighlight",
+            	"title": "Add highlight"
             },
-            {
-                "command": "hex.radix",
-                "title": "Radix"
-            },
-            {
-                "command": "hex.copy_hex",
-                "title": "Copy hex"
-            },
-            {
-                "command": "hex.copy_ascii",
-                "title": "Copy ascii"
-            }
+			{
+				"command": "hex.removeHighlight",
+				"title": "Remove Highlight"
+			}
 		],
 
-        "keybindings":[
-            { "command": "hex.copy_hex",    "key": "ctrl+c"}
-        ],
 
-        "submenus": [
-            {
-                "id": "hex.options",
-                "label": "Hex Options",
-                "icon": "$(settings)"
-            }
-        ],
+		"keybindings":[
+			{ "command": "hex.copy_hex",	"key": "ctrl+c", "when": "activeCustomEditorId == hex.view"},
+			{ "command": "hex.goto",	    "key": "ctrl+g", "when": "activeCustomEditorId == hex.view"}
+		],
 
-        "menus": {
-            "editor/title": [
+		"menus": {
+			"editor/title": [
                 {
-                    "submenu": "hex.options",
-                    "when": "activeCustomEditorId == hex.view",
-                    "group": "navigation"
-                }
-            ],
-            "hex.options": [
-                { "command": "hex.bytesPerLine"},
-                { "command": "hex.radix"}
-            ],
-            "webview/context": [
+					"command": "hex.reopen",
+					"when": "activeCustomEditorId != hex.view",
+					"group": "navigation"
+				},
                 {
-                    "command": "hex.copy_hex",
-                    "when": "webviewId == 'hex.view' && selection && section=='hex'"
-                },
+					"command": "hex.radix",
+					"when": "activeCustomEditorId == hex.view",
+					"group": "navigation@1"
+				},
                 {
-                    "command": "hex.copy_ascii",
-                    "when": "webviewId == 'hex.view' && selection && section=='ascii'"
-                },
+					"command": "hex.text",
+					"when": "activeCustomEditorId == hex.view",
+					"group": "navigation@2"
+				},
                 {
-                    "command": "hex.bytesPerLine",
-                    "when": "webviewId == 'hex.view'"
-                },
-                {
-                    "command": "hex.radix",
-                    "when": "webviewId == 'hex.view'"
-                }
-            ]
-        }
+					"command": "hex.bytesPerLine",
+					"when": "activeCustomEditorId == hex.view",
+					"group": "navigation@3"
+				}
+
+			],
+			"webview/context": [
+				{
+					"command": "hex.goto",
+					"when": "webviewId == 'hex.view'"
+				},
+				{
+					"command": "hex.copy_hex",
+					"when": "webviewId == 'hex.view' && selection && section=='hex'"
+				},
+				{
+					"command": "hex.copy_text",
+					"when": "webviewId == 'hex.view' && selection && section=='text'"
+				},
+				{
+					"command": "hex.bytesPerLine",
+					"when": "webviewId == 'hex.view'"
+				},
+				{
+					"command": "hex.radix",
+					"when": "webviewId == 'hex.view'"
+				},
+				{
+					"command": "hex.text",
+					"when": "webviewId == 'hex.view'"
+				},
+				{
+					"command": "hex.addHighlight",
+					"when": "webviewId == 'hex.view' && selection"
+				},
+				{
+					"command": "hex.removeHighlight",
+					"when": "webviewId == 'hex.view' && highlight"
+				}
+			]
+		}
 	},
 
-    "scripts_webpack": {
-        "vscode:prepublish": "npm run package",
-        "compile": "webpack",
-        "watch": "webpack --watch",
-        "package": "webpack --mode production --devtool hidden-source-map",
-        "test-compile": "tsc -p ./",
+	"scripts_webpack": {
+		"vscode:prepublish": "npm run package",
+		"compile": "webpack",
+		"watch": "webpack --watch",
+		"package": "webpack --mode production --devtool hidden-source-map",
+		"test-compile": "tsc -p ./",
 		"publish": "vsce publish patch"
-    },
+	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
 		"compile": "tsc -p ./",

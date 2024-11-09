@@ -1,8 +1,6 @@
 body {
+	padding: 0;
     margin: 0;
-    padding: 0;
-    /*width: 100vw;
-    height: 100vh;*/
     overflow: hidden;
     user-select: none;
     --row-height: 20px;
@@ -11,11 +9,17 @@ body {
     --num-columns: 16;
 }
 
+span {
+    overflow: hidden;
+    height: 100%;
+}
+
 .container {
     overflow-x: hidden;
     overflow-y: scroll;
-    width: calc(100vw + 15px);
+    width: 100vw;
     height: 100vh;
+    scrollbar-width: none;
 }
 
 .hexview {
@@ -23,9 +27,9 @@ body {
     display:    flex;
     overflow:   hidden;
     column-gap: 10px;
-    font-family: var(--vscode-editor-font-family);
-    font-size: var(--vscode-editor-font-size);
-    color: var(--vscode-foreground);
+    font-family: var(--vscode-editor-font-family),'Segoe UI Emoji';
+    font-size:  var(--vscode-editor-font-size);
+    color:      var(--vscode-foreground);
 
     &::before {
         content: '';
@@ -43,12 +47,15 @@ body {
 
 .data {
     display: contents;
-    text-align:right;
 }
 
 .placeholder {
     display: contents;
+    text-align:right;
     & span {
+        width: 0;
+        height: 0;
+        overflow: hidden;
         visibility: hidden;
     }
 }
@@ -64,58 +71,46 @@ body {
         &:hover {
             background-color: var(--vscode-editor-hoverHighlightBackground);
         }
-    
     }
 }
 
 .hex {
-    flex: var(--digits);
-    /*height: 100vh;*/
+    flex: calc(var(--digits) + 1);
     overflow: hidden;
     position: relative;
     scrollbar-width: none;
+    text-align:right;
 
-    --width: calc(var(--digits) * var(--digit-width));
+    --width: calc((var(--digits) + 1) * var(--digit-width));
     display: grid;
     grid-template-columns: repeat(var(--num-columns), var(--width));
     grid-auto-rows: var(--row-height);
 
     & .placeholder span::before {
         visibility: visible;
+        position: absolute;
         content: '--';
     }
 
     & span:hover {
-        position: relative;
-
-        &::after {
-            content: '';
-            position: absolute;
-            top: -5px;
-            left: 0px;
-            right: -5px;
-            bottom: -5px;
-	        border: 2px solid var(--vscode-editorHoverWidget-border);
-            border-radius: 10px;
-            pointer-events: none;
-            z-index: 1;
-        }
-
+        background-color: var(--vscode-editor-hoverHighlightBackground);
     }
 }
 
-.ascii {
-    flex: 1;
+.text {
+    flex: 2;
     /*overflow: hidden;*/
     position: relative;
+    text-align:left;
 
-    --width: var(--digit-width);
+    --width: calc(2 * var(--digit-width));
     display: grid;
-    grid-template-columns: repeat(var(--num-columns), var(--digit-width));
+    grid-template-columns: repeat(var(--num-columns), var(--width));
     grid-auto-rows: var(--row-height);
 
     & .placeholder span::before {
         visibility: visible;
+        position: absolute;
         content: '.';
     }
 
@@ -127,7 +122,7 @@ body {
 .selection {
     position: absolute;
     background-color: var(--vscode-editor-selectionBackground);
-    pointer-events: none;
+    /*pointer-events: none;*/
     z-index: -1;
 
     &[data-multi-row="false"] {
@@ -156,13 +151,39 @@ body {
 
         }
         &::after {
+            left: 0;
             bottom: calc(-1 * var(--row-height));
             width: calc(var(--end-x) * var(--width));
         }
     }
 }
 
-#tooltip {
+
+.color-picker {
+    position: absolute;
+    cursor: pointer;
+    z-index: 1;
+    padding: 0;
+    transition: opacity .2s linear;
+
+    &.invisible {
+        opacity: 0;
+    }
+
+    /*
+    opacity: 0;
+    pointer-events: auto;
+    top:    calc(round(var(--picker-offset) / var(--num-columns) - 0.5) * var(--row-height));
+    left:   calc(mod(var(--picker-offset), var(--num-columns)) * var(--width));
+    top:    calc(var(--picker-y) * var(--row-height));
+    left:   calc(var(--picker-x) * var(--width));
+    */
+    height: var(--row-height);
+    width:  var(--width);
+
+}
+
+.tooltip {
 	position: absolute;
     display:    none;
     padding:    .5em;
@@ -175,38 +196,4 @@ body {
 	box-shadow: 0 2px 8px var(--vscode-widget-shadow);
     white-space: pre-wrap;
     pointer-events: none;
-}
-
-.vscrollbar, .hscrollbar {
-	position: fixed;
- 
-    background: transparent;
-    opacity: 1;
-    transition: opacity .4s linear;
-    z-index: 11;
-
-    background: var(--vscode-scrollbarSlider-background);
-
-    &:hover {
-        background: var(--vscode-scrollbarSlider-hoverBackground);
-    }
-    &.active {
-        background: var(--vscode-scrollbarSlider-activeBackground)
-    }
-
-    &.invisible {
-        opacity: 0;
-        transition: opacity .8s linear;
-        pointer-events: none;
-    }
-}
-
-.vscrollbar {
-    right: 0;
-    width: 14px;
-}
-
-.hscrollbar {
-    bottom: 0;
-    height: 14px;
 }

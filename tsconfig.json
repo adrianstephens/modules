@@ -20,6 +20,6 @@
 		"jsxFragmentFactory": "fragment",
 		"forceConsistentCasingInFileNames": true
 	},
-	"include": ["src"],
+	"include": ["src", "hidden/VariablesView.tsx"],
 	"exclude": ["node_modules", ".vscode-test", "hidden"]
 }

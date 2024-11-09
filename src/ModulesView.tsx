@@ -1,11 +1,11 @@
 
 import * as vscode from "vscode";
 import * as path from "path";
-import * as utils from "./modules/utils";
+import * as utils from "./shared/utils";
 import {DebugProtocol} from '@vscode/debugprotocol';
-import {jsx, fragment, codicons} from "./modules/jsx";
+import {jsx, fragment, codicons, id_selector} from "./shared/jsx";
 import * as telemetry from "./telemetry";
-import {bad_reporter} from "./extension";
+import * as main from "./extension";
 
 //-----------------------------------------------------------------------------
 //	ModuleViewProvider
@@ -45,7 +45,7 @@ const column_descriptors: Record<string, ColumnDescriptor> = {
 	addressRange:  	descriptorAddress('Address', 'addressRange'),
 	vsLoadAddress: 	descriptorAddress("Address", 'vsLoadAddress'),
 	vsModuleSize: 	{label: "Size",			type: 'number'},
-	path:   		descriptorPath('Path', 'path'),
+	path:			descriptorPath('Path', 'path'),
 	vsIs64Bit: 		descriptorBoolean("64 Bit", 'vsIs64Bit'),
 	isOptimized:   	descriptorBoolean('Optimized', 'isOptimized'),
 	isUserCode: 	descriptorBoolean('User Code', 'isUserCode'),
@@ -88,71 +88,15 @@ async function getModuleAddressFunction(session: vscode.DebugSession, frameId: n
 	return '';
 }
 
-const DEBUG_MEMORY_SCHEME = 'vscode-debug-memory';
-const getUriForDebugMemory = (
-	sessionId: string,
-	memoryReference: string,
-	range?: { fromOffset: number; toOffset: number },
-	displayName = 'memory'
-) => {
-	return vscode.Uri.from({
-		scheme: DEBUG_MEMORY_SCHEME,
-		authority: sessionId,
-		path: '/' + encodeURIComponent(memoryReference) + `/${encodeURIComponent(displayName)}`,
-		query: range ? `?range=${range.fromOffset}:${range.toOffset}` : undefined,
-	});
-};
-
-const DEBUG_SOURCE_SCHEME = 'vscode-debug-source';
-const getUriForDebugSource = (
-	sessionId: string,
-	sourceReference: number,
-	displayName: string
-) => {
-	return vscode.Uri.from({
-		scheme: DEBUG_SOURCE_SCHEME,
-		authority: sessionId,
-		path: '/' + sourceReference.toString() + '/' + displayName,
-	});
-};
-
-class DebugSourceTextProvider implements vscode.TextDocumentContentProvider {
-	async provideTextDocumentContent(uri: vscode.Uri) {
-		const sessionId = uri.authority;
-		const parts = uri.path.split('/');
-		const sourceReference = +parts[1];
-		if (vscode.debug.activeDebugSession?.id === sessionId) {
-			const resp = await vscode.debug.activeDebugSession.customRequest('source', {sourceReference});
-			return resp.content;
-		}
-	}
-}
-
-async function openPreview(uri: vscode.Uri) {
-	const document = await vscode.workspace.openTextDocument(uri);
-	await vscode.window.showTextDocument(document, {
-		preview: true,
-		viewColumn: vscode.ViewColumn.Active
-	});
-}
-
-
-function by_id(id: string | number) {
-	if (typeof id === 'number')
-		return `[id="${id}"]`;
-
-	id = id.replace(/[!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~]/g, "\\$&");
-	return id[0] >= '0' && id[0] <= '9' ? `[id="${id}"]` : `#${id}`;
-}
-
-export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode.DebugAdapterTracker {
-	private view?: vscode.WebviewView;
-	private receive?: vscode.Disposable;
+export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
+	private session?:	vscode.DebugSession;
+	private view?:		vscode.WebviewView;
+	
 	private update	= new utils.CallCombiner(async () => {
 		if (this.view)
 			this.view.webview.html = this.updateView();
 	}, 100);
-	private tele    = new utils.CallCombiner0;
+	private tele	= new utils.CallCombiner0;
 
 	modules: Record<string, Module> = {};
 	address_function	= '';
@@ -161,19 +105,29 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 	selected_id?: string;
 
 	constructor(private context: vscode.ExtensionContext) {
-		const me = this;
-		vscode.debug.registerDebugAdapterTrackerFactory('*', {
-			createDebugAdapterTracker(session: vscode.DebugSession) {
-				return me;
-			}
+		context.subscriptions.push(vscode.Disposable.from(
+			vscode.window.registerWebviewViewProvider('modules-view', this),
+			vscode.commands.registerCommand('modules.getModules', () => Object.values(this.modules))
+		));
+
+		main.DebugSession.onCreate(session => {
+			this.session = session.session;
+			session.onMessage(message => this.onDidSendMessage(message));
+			session.onDidChangeState(state => {
+				if (state === main.State.Inactive) {
+					this.session			= undefined;
+					this.nextOrder			= 0;
+					this.selected_id		= undefined;
+					this.address_requested.clear();
+					this.address_function	= '';
+					this.modules			= {};
+					this.update.trigger();
+				}
+			})
 		});
-		vscode.workspace.registerTextDocumentContentProvider(DEBUG_SOURCE_SCHEME, new DebugSourceTextProvider);
+
 	}
 
-	dispose() {
-		this.receive?.dispose();
-	}
-		
 	private setText(id: string, value:any) {
 		this.view?.webview.postMessage({command: 'set_text', id, value});
 	}
@@ -204,50 +158,42 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 			localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'assets')]
 		};
 
-		this.receive = webviewView.webview.onDidReceiveMessage(async message => {
+		webviewView.webview.onDidReceiveMessage(async message => {
 			switch (message.command) {
 				case 'select': {
 					const m = this.modules[message.id];
 					if (message.id !== this.selected_id) {
 						if (this.selected_id)
-							this.addClass(by_id(this.selected_id), 'selected', false);
+							this.addClass(id_selector(this.selected_id), 'selected', false);
 						this.selected_id = message.id;
-						this.addClass(by_id(message.id), 'selected', true);
+						this.addClass(id_selector(message.id), 'selected', true);
 					}
 					break;
 				}
 				case 'click': {
 					const m = this.modules[message.id];
-					const session = vscode.debug.activeDebugSession;
-					if (session && m.addressRange) {
+					if (this.session && m.addressRange) {
 						//vscode.commands.executeCommand('workbench.debug.viewlet.action.viewMemory', m.addressRange);
-						const uri = getUriForDebugMemory(session.id, m.addressRange, undefined, m.name);
-						await vscode.commands.executeCommand('vscode.openWith', uri, 'hexEditor.hexedit', {preview: true});
-					} else if (session && m.sourceReference) {
-						openPreview(getUriForDebugSource(session.id, m.sourceReference, path.extname(m.name) ? m.name : m.name + '.js'));
+						//const uri = main.DebugMemory.makeUri(this.session, m.addressRange, undefined, m.name);
+						//await vscode.commands.executeCommand('vscode.openWith', uri, 'hexEditor.hexedit', {preview: true});
+						const uri = main.DebugMemoryFileSystem.makeUri(this.session, m.addressRange, undefined, m.name);
+						await vscode.commands.executeCommand('vscode.openWith', uri, 'hex.view', {preview: true});
+
+					} else if (this.session && m.sourceReference) {
+						main.openPreview(main.DebugSource.makeUri(this.session, m.sourceReference, path.extname(m.name) ? m.name : m.name + '.js'));
 					} else if (m.path) {
-						openPreview(vscode.Uri.file(m.path));
+						main.openPreview(vscode.Uri.file(m.path));
 					}
 					break;
 				}
 				case 'open': {
-                    console.log(message);
-                    vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.path));
-                    break;
-                }
+					vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.path));
+					break;
+				}
 
 			}
 		});
 
-		this.update.trigger();
-	}
-
-	onWillStopSession(): void {
-		this.nextOrder			= 0;
-		this.selected_id		= undefined;
-		this.address_requested.clear();
-		this.address_function	= '';
-		this.modules			= {};
 		this.update.trigger();
 	}
 
@@ -262,8 +208,8 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 				case 'stackTrace':
 					//cppvsdbg doesn't return module addresses, so we do it by evaluating GetModuleHandleA
 					//other debuggers might need their own hacks
-					if (vscode.debug.activeDebugSession?.type === 'cppvsdbg')
-						this.fixModuleAddresses(vscode.debug.activeDebugSession);
+					if (this.session?.type === 'cppvsdbg')
+						this.fixModuleAddresses(this.session);
 					break;
 			}
 		}
@@ -308,13 +254,13 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 	}
 
 	getUri(name: string) {
-		return  this.view!.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'assets', name));
+		return main.webviewUri(this.context, this.view!.webview, name);
 	}
 
 	updateView() : string {
 		const	modules = Object.values(this.modules);
 		if (modules.length == 0) {
-			const type = vscode.debug.activeDebugSession?.type;
+			const type = this.session?.type;
 			if (type)
 				telemetry.send('view.none', {type});
 
@@ -328,7 +274,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 
 		const has_col	= modules.reduce((cols, m) => (Object.keys(m).forEach(k => cols.add(k)), cols), new Set<string>());
 
-        this.tele.combine(1000, () => telemetry.send('view.update', {type: vscode.debug.activeDebugSession?.type || 'unknown', cols: Array.from(has_col.keys()).join(', '), rows: modules.length}));
+		this.tele.combine(1000, () => telemetry.send('view.update', {type: this.session?.type || 'unknown', cols: Array.from(has_col.keys()).join(', '), rows: modules.length}));
 
 		if (has_col.has('vsLoadAddress')) {
 			has_col.delete('vsLoadAddress');
@@ -350,6 +296,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 				<head>
 					<meta charset="UTF-8"/>
 					<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+					<link rel="stylesheet" type="text/css" href={this.getUri('shared.css')}/>
 					<link rel="stylesheet" type="text/css" href={this.getUri('modules.css')}/>
 					<title>Modules</title>
 				</head>
@@ -369,6 +316,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider, vscode
 						)}
 					</tbody>
 				</table>
+				<script src={this.getUri("shared.js")}></script>
 				<script src={this.getUri("modules.js")}></script>
 			</body></html>;
 	}

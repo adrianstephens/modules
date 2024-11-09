@@ -1,25 +1,27 @@
-const vscode = acquireVsCodeApi();
+const state			= {top:0, radix:16, text:1, columns:0, selection:{a:-1, b:-1}, highlights:[], ...vscode.getState()};
 
 const container		= document.querySelector('.container');
 const hexview		= document.querySelector('.hexview');
 const addr_col		= document.querySelector('.addr');
 const hex_col		= document.querySelector('.hex');
-const ascii_col		= document.querySelector('.ascii');
-const tooltip 		= makeDivClass('tooltip');
+const text_col		= document.querySelector('.text');
+const tooltip 		= createElement('div', {className: 'tooltip'});
+const color_picker	= createElement('input', {type: 'color', value: '#ff0000', className: 'color-picker invisible'});
 
 const body_style	= getComputedStyle(document.body);
+const hex_style		= getComputedStyle(hex_col);
 
 const row_height	= parseInt(body_style.getPropertyValue('--row-height'));
 const digit_width	= parseInt(body_style.getPropertyValue('--digit-width'));
 const chunk_size	= 1024;
-const state			= [];
+const chunks		= [];
 const hex_divs		= [];
-const ascii_divs	= [];
+const text_divs		= [];
 const addr_divs		= [];
 const blocks		= [];
 
-let hex_width		= digit_width * 2;
 let num_digits		= 2;
+let hex_width		= (num_digits + 1) * digit_width;
 let total			= 0;
 let num_columns		= 0;
 let current_radix	= 16;
@@ -27,108 +29,14 @@ let current_signed	= false;
 let little_endian	= true;
 let auto_columns	= false;
 let filling 		= false;
-let last_top		= 0;
-let selection_a		= -1;
-let selection_b		= -1;
-
-function makeDivClass(className) {
-	const div = document.createElement("div");
-	div.className = className;
-	return div;
-}
-
-class ScrollBar {
-	thumb_size;
-
-	constructor(parent, container, horizontal) {
-		const thumb 	= makeDivClass(horizontal ? 'hscrollbar' : 'vscrollbar');
-		parent.appendChild(thumb);
-
-		this.thumb		= thumb;
-		this.container	= container;
-		this.horizontal = horizontal;
-
-		thumb.addEventListener('mousedown', event => {
-			const mouseOffset 	= horizontal ? thumb.offsetLeft - event.clientX : thumb.offsetTop - event.clientY;
-			thumb.classList.add('active');
-
-			const onMouseMove = event => {
-				this.setThumbPixel(mouseOffset + (horizontal ? event.clientX : event.clientY));
-			};
-	
-			const onMouseUp = () => {
-				thumb.classList.remove('active');
-				document.removeEventListener('mousemove',	onMouseMove);
-				document.removeEventListener('mouseup',		onMouseUp);
-			};
-
-			document.addEventListener('mousemove',	onMouseMove);
-			document.addEventListener('mouseup', 	onMouseUp);
-		});
-	}
-
-	get sizes() {
-		const client = this.container.getBoundingClientRect();
-		return this.horizontal
-			? [this.container.clientWidth, this.container.scrollWidth, client.left]
-			: [this.container.clientHeight, this.container.scrollHeight, client.top];
-	}
-
-	update() {
-		this.setThumb(this.horizontal ? this.container.scrollLeft : this.container.scrollTop);
-	}
-
-	setThumbSize(size) {
-		if (size != this.thumb_size) {
-			this.thumb_size = size;
-			if (this.horizontal)
-				this.thumb.style.width 	= `${size}px`;
-			else
-				this.thumb.style.height = `${size}px`;
-		}
-	}
-	
-	setThumb(scroll) {
-		const [window_size, total_size, offset]	= this.sizes;
-		let thumb_pos, thumb_size;
-	
-		if (window_size >= total_size) {
-			this.thumb.classList.add('invisible');
-			thumb_size	= total_size;
-			thumb_pos	= offset;
-		} else {
-			this.thumb.classList.remove('invisible');
-			thumb_size	= Math.max(window_size * window_size / total_size, 20);
-			thumb_pos	= offset + scroll * (window_size - thumb_size) / (total_size - window_size);
-		}
-
-		this.setThumbSize(thumb_size);
-
-		if (this.horizontal)
-			this.thumb.style.left 	= `${thumb_pos}px`;
-		else
-			this.thumb.style.top 	= `${thumb_pos}px`;
-	}
-	
-	setThumbPixel(pos) {
-		const [window_size, total_size, offset]	= this.sizes;
-		const thumb_pos		= Math.min(Math.max(pos, offset), offset + window_size - this.thumb_size);
-		const scroll		= (thumb_pos - offset) * (total_size - window_size) / (window_size - this.thumb_size);
-
-		if (this.horizontal) {
-			this.thumb.style.left		= `${thumb_pos}px`;
-			this.container.scrollLeft	= scroll;
-		} else {
-			this.thumb.style.top 		= `${thumb_pos}px`;
-			this.container.scrollTop	= scroll;
-		}
-	}
-}
+let selecting		= false;
 
 class Selection {
-	constructor(parent) {
-		this.selection = makeDivClass('selection');
-		parent.appendChild(this.selection);
+	constructor(parent, color) {
+		this.element = createElement('div', {className: 'selection'});
+		if (color)
+			this.element.style.backgroundColor = color;
+		parent.appendChild(this.element);
 	}
 
 	set(a, b, num_columns) {
@@ -139,17 +47,47 @@ class Selection {
 		}
 		++b;
 	
-		const selection = this.selection;
+		const element = this.element;
 		const startY = Math.floor(a / num_columns);
 		const endY = Math.floor(b / num_columns);
-		selection.setAttribute('data-multi-row', startY != endY);
+		element.setAttribute('data-multi-row', startY != endY);
 	
-		selection.style.setProperty('--start-x', a % num_columns);
-		selection.style.setProperty('--start-y', startY);
-		selection.style.setProperty('--end-x', b % num_columns);
-		selection.style.setProperty('--end-y', endY);
+		element.style.setProperty('--start-x', a % num_columns);
+		element.style.setProperty('--start-y', startY);
+		element.style.setProperty('--end-x', b % num_columns);
+		element.style.setProperty('--end-y', endY);
+	}
+	remove() {
+		this.element.parentNode.removeChild(this.element);
 	}
 }
+
+class Highlight {
+	constructor(a, b, color) {
+		this.a 		= a;
+		this.b 		= b;
+		this.color 	= color;
+		this.hex	= new Selection(hex_col, color);
+		this.text	= new Selection(text_col, color);
+	}
+	remove() {
+		this.hex.remove();
+		this.text.remove();
+	}
+	update(num_columns) {
+		this.hex.set(this.a, this.b, num_columns);
+		this.text.set(this.a, this.b, num_columns);
+	}
+	setColor(color) {
+		this.color = color;
+		this.hex.element.style.backgroundColor = color;
+		this.text.element.style.backgroundColor = color;
+	}
+	contains(i) {
+		return i >= this.a && i <= this.b;
+	}
+}
+
 
 class Spacer2D {
 	constructor(parent) {
@@ -182,20 +120,32 @@ class Spacer2D {
 			col_spacer.style.display = 'none';
 		}
 	}
-
 }
 
 const hex_spacer	= new Spacer2D(hex_col);
-const ascii_spacer	= new Spacer2D(ascii_col);
+const text_spacer	= new Spacer2D(text_col);
 const vscroll 		= new ScrollBar(document.body, container, false);
 const hscroll 		= new ScrollBar(hex_col, hex_col, true);
 const hex_selection		= new Selection(hex_col);
-const ascii_selection	= new Selection(ascii_col);
+const text_selection	= new Selection(text_col);
+const highlights	= [];
+let current_highlight;
 
 document.addEventListener('DOMContentLoaded', () => {
 	document.body.appendChild(tooltip);
 	addr_col.textContent = '00000000';
-	vscode.postMessage({command: 'ready'});
+	vscode.postMessage({command: 'ready', state});
+
+	hex_col.appendChild(color_picker);
+	color_picker.addEventListener('input', event => {
+		if (current_highlight) {
+			const color = event.target.value + '80';
+			current_highlight?.setColor(color);
+			const i = highlights.indexOf(current_highlight);
+			state.highlights[i].color = color;
+			vscode.setState(state);
+		}
+	});
 });
 
 function getOffset(span) {
@@ -235,9 +185,10 @@ function discardBlock(placeholder) {
 	blocks.push(placeholder);
 }
 
-function insertBlock(i, col, divs) {
+function insertBlock(i, col, divs, className) {
 	const block	= getBlock();
 	block.chunk = i;
+	block.className = className;
 	divs[i]		= block;
 
 	let before = divs[i + 1];
@@ -248,54 +199,249 @@ function insertBlock(i, col, divs) {
 }
 
 //-----------------------------------------------------------------------------
+//	radix + text coding
+//-----------------------------------------------------------------------------
+
+function getNumber(value, radix, digits) {
+	return value.toString(radix).padStart(digits, '0');
+}
+
+function getValueString(byte) {
+	return current_signed && byte >= 128
+		? '-' + getNumber(256 - byte, current_radix, num_digits)
+		: getNumber(byte, current_radix, num_digits);
+}
+
+function setRadix(radix) {
+	current_radix	= Math.abs(radix);
+	current_signed	= radix < 0;
+	const	digits	= current_radix == 2 ? 8 : current_radix < 16 ? 3 : 2;
+	const	digits1	= digits + (current_signed ? 1 : 0);
+	document.body.style.setProperty('--digits', digits1.toString());
+	hex_width		= (digits1 + 1) * digit_width;
+	num_digits		= current_radix == 10 ? 0 : digits;
+}
+
+function byteSwap16(i) {
+	return (i >> 8) | ((i & 0xff) << 8);
+}
+
+const dot = '.'.charCodeAt(0);
+const cont = 0xb7;//0x25cc;//32;//'.'.charCodeAt(0);
+
+function getCharactersUTF8(data) {
+	const str = new TextDecoder('utf8').decode(data);
+	const result = [];
+	for (let i = 0; i < str.length; i++) {
+		const c = str.codePointAt(i);
+		result.push(c > 32 ? c : dot);
+		if (c >= 0x80) {
+			result.push(cont);
+			if (c >= 0x800) {
+				result.push(cont);
+				if (c >= 0x10000) {
+					++i;
+					result.push(cont);
+				}
+			}
+		}
+	}
+	return result;
+}
+
+function getCharactersSHIFT_JIS(data) {
+	let result = [];
+	const str = new TextDecoder('shift-jis').decode(data);
+	for (let i = 0, j = 0; i < data.length; i++) {
+		const c = str.codePointAt(j++);
+		const d = data[i];
+		result.push(c > 32 ? c : dot);
+
+		if (d > 0xdf || (d >= 0x80 && d < 0xa1)) {
+			const d1 = data[i + 1];
+			if (d1 >= 0x40 && d1 <= 0xFC && d1 !== 0x7F) {
+				result.push(cont);
+				++i;
+			}
+		}
+	}
+	return result;
+}
+
+function getCharactersGB18030(data) {
+	let result = [];
+	const str = new TextDecoder('gb18030').decode(data);
+	for (let i = 0, j = 0; i < data.length; i++) {
+		const c = str.codePointAt(j++);
+		const d = data[i];
+		result.push(c > 32 ? c : dot);
+
+		if (d >= 0x81 && d <= 0xFE) {
+			const d1 = data[i + 1];
+
+			if (d1 >= 0x40 && d1 <= 0xFE && d1 !== 0x7F) {
+				++i;
+				result.push(cont);
+
+			} else if (d1 >= 0x30 && d1 <= 0x39) {
+				const d2 = data[i + 2];
+				const d3 = data[i + 3];
+				if (d2 >= 0x81 && d2 <= 0xFE && d3 >= 0x30 && d3 <= 0x39) {
+					i += 3;
+					result.push(cont);
+					result.push(cont);
+					result.push(cont);
+				}
+			}
+		}
+	}
+	//if (j !== str.length)
+	//	console.log(`character usage - ${j} != ${str.length}!`);
+
+	return result;
+}
+
+function getCharactersBIG5(data) {
+	let result = [];
+	const str = new TextDecoder('big5').decode(data);
+	for (let i = 0, j = 0; i < data.length; i++) {
+		const c = str.codePointAt(j++);
+		const d = data[i];
+		result.push(c > 32 ? c : dot);
+
+		if (d >= 0xA1 && d <= 0xFE) {
+			const d1 = data[i + 1];
+			if ((d1 >= 0x40 && d1 <= 0x7E) || (d1 >= 0xA1 && d1 <= 0xFE)) {
+				++i;
+				result.push(cont);
+			}
+		}
+	}
+	return result;
+}
+
+function getCharactersISO2020KR(data) {
+	const str = new TextDecoder('iso-2022-kr').decode(data);
+	for (let i = 0, j = 0; i < data.length; i++) {
+		const d = data[i];
+		if (d === 0x1B) {
+			result.push(cont);
+			while (++i < data.length && data[i] !== 0x28 && data[i] !== 0x4A && data[i] !== 0x42)
+				result.push(cont);
+		} else {
+			const c = str.codePointAt(j++);
+			result.push(c > 32 ? c : dot);
+
+			if (d >= 0xA1 && d <= 0xFE) {
+				const d1 = data[i + 1];
+				if (d1 >= 0xA1 && d1 <= 0xFE) {
+					++i;
+					result.push(cont);
+				}
+			}
+		}
+	}
+	return result;
+}
+
+function getCharacters(data) {
+	switch (state.text) {
+		case 0:	//none
+			return;
+
+		case 1:	//ASCII
+			return Array.from(data).map(c => c > 32 && c < 127 ? c : dot);
+
+		case 2:	//UTF-8
+			return getCharactersUTF8(data);
+
+		case 3:	{//UTF-16LE
+			const data2 = new Uint16Array(data.buffer, data.byteOffset, data.byteLength / 2);
+			return Array.from(data2).map(c => [32, c > 32 ? c : dot]).flat();
+		}
+		case 4:	{//UTF-16BE
+			const data2 = new Uint16Array(data.buffer, data.byteOffset, data.byteLength / 2);
+			return Array.from(data2).map(c0 => { const c = byteSwap16(c0); return [32, c > 32 ? c : dot];}).flat();
+		}
+		case 5: //SHIFT-JIS
+			return getCharactersSHIFT_JIS(data);
+
+		case 6: //gb18030
+			return getCharactersGB18030(data);
+
+		case 7: //big5
+			return getCharactersBIG5(data);
+
+		case 8: //iso-2022-kr
+			return getCharactersISO2020KR(data);
+
+		default:
+			return Array(data.length).fill(dot);
+	}
+}
+
+function setText(text) {
+//	text_col.style.display = text ? '' : 'none';
+}
+
+//-----------------------------------------------------------------------------
 //	scroll
 //-----------------------------------------------------------------------------
 
 function requestChunk(i) {
-	if (!state[i]) {
-		state[i] = 'pending';
+	if (!chunks[i]) {
+		chunks[i] = 'pending';
 
-		insertBlock(i, hex_col, hex_divs).className = 'placeholder';
-		insertBlock(i, ascii_col, ascii_divs).className = 'placeholder';
+		insertBlock(i, hex_col, hex_divs, 'placeholder');
+		insertBlock(i, text_col, text_divs, 'placeholder');
 		vscode.postMessage({
 			command: 'load',
 			offset: i * chunk_size,
 			length: chunk_size
 		});
-/*
-		setTimeout(()=> 
-			vscode.postMessage({
-			command: 'load',
-			offset: i * chunk_size,
-			length: chunk_size
-		}), 0);
-		*/
 	}
 }
 
-function fillChunk(chunk, data, offset) {
-	if (state[chunk] !== 'pending') {
-		console.log("fillChunk: invalid state", state[chunk]);
+function fillHexChunk(hex, data) {
+	const size	= data.length;
+
+	for (let k = 0; k < size; k++)
+		hex.children[k].textContent = getValueString(data[k]);
+
+	for (let k = size; k < chunk_size; k++)
+		hex.children[k].textContent		= '';
+}
+
+function fillTextChunk(text, data) {
+	if (state.text) {
+		const size	= data.length;
+		const s		= getCharacters(data);
+		if (s.length !== size)
+			console.log(`character len mismatch - ${s.length} != ${size}!`);
+
+		let k = 0;
+		for (const c of s)
+			text.children[k++].textContent = String.fromCodePoint(c);
+		for (let k = size; k < chunk_size; k++)
+			text.children[k].textContent	= '';
 	}
-	if (state[chunk] === 'pending') {
+}
+
+function fillChunk(chunk, data) {
+	if (chunks[chunk] !== 'pending') {
+		console.log("fillChunk: invalid state", chunks[chunk]);
+	}
+	if (chunks[chunk] === 'pending') {
 		const hex	= hex_divs[chunk];
-		const ascii	= ascii_divs[chunk];
-		const size	= Math.min(chunk_size, data.length - offset);
+		const text	= text_divs[chunk];
 
-		for (let k = 0; k < size; k++) {
-			const byte = data[offset + k];
-			hex.children[k].textContent		= getValueString(byte);
-			ascii.children[k].textContent	= byte > 32 && byte < 127 ? String.fromCharCode(byte) : '.';
-		}
-		for (let k = size; k < chunk_size; k++) {
-			hex.children[k].textContent		= '';
-			ascii.children[k].textContent	= '';
-		}
-
+		fillHexChunk(hex, data);
 		hex.className	= 'data';
-		ascii.className	= 'data';
-//		state[chunk] 	= 'loaded';
-		state[chunk] 	= data.subarray(offset, size);
+
+		fillTextChunk(text, data);
+		text.className	= 'data';
+
+		chunks[chunk] 	= data;
 	}
 }
 
@@ -307,8 +453,9 @@ function fillData(y) {
 	const bottom	= Math.min(Math.ceil((y + window.innerHeight) / row_height), rows);
 
 	const top_addr	= top * num_columns;
-	if (top_addr !== last_top) {
-		last_top	= top_addr;
+	if (top_addr !== state.top) {
+		state.top	= top_addr;
+		vscode.setState(state);
 		//setTimeout(()=> vscode.postMessage({command: 'scroll', top: top_addr}), 0);
 	}
 
@@ -323,8 +470,7 @@ function fillData(y) {
 	}
 	for (let i = addr0; i < addr1; i++) {
 		if (!addr_divs[i]) {
-			const addr = insertBlock(i, addr_col, addr_divs);
-			addr.className = 'data';
+			const addr = insertBlock(i, addr_col, addr_divs, 'data');
 			const offset = i * chunk_size;
 			for (let k = 0; k < chunk_size; k++)
 				addr.children[k].textContent = ((offset + k) * num_columns).toString(16).padStart(8, '0');
@@ -339,41 +485,28 @@ function fillData(y) {
 	const extra = 1;
 	const a1 = Math.max(a - extra, 0), b1 = Math.min(b + extra, Math.floor(total / chunk_size));
 
-	for (const i in state) {
+	for (const i in chunks) {
 		if (i < a || i >= b) {
 		//if (i < a1 || i >= b1) {
 			hex_col.removeChild(hex_divs[i]);
-			ascii_col.removeChild(ascii_divs[i]);
+			text_col.removeChild(text_divs[i]);
 			discardBlock(hex_divs[i]);
-			discardBlock(ascii_divs[i]);
+			discardBlock(text_divs[i]);
 			delete hex_divs[i];
-			delete ascii_divs[i];
-			delete state[i];
+			delete text_divs[i];
+			delete chunks[i];
 		}
 	}
 
 	hex_spacer.set(a * chunk_size, num_columns);
-	ascii_spacer.set(a * chunk_size, num_columns);
+	text_spacer.set(a * chunk_size, num_columns);
 
 	for (let i = a; i < b; i++)
 		requestChunk(i);
-/*
-	if (filling) {
-		console.log('already filling');
-	} else {
-		filling = true;
-		setTimeout(() => {
-			for (let i = a1; i < a; ++i)
-				requestChunk(i, changed_cols);
-			for (let i = b; i < b1; ++i)
-				requestChunk(b, changed_cols);
-			filling = false;
-		}, 0);
-	}
-*/
+
 }
 
-/*
+
 let ticking = false;
 container.addEventListener("scroll", event => {
 	if (!ticking) {
@@ -386,13 +519,14 @@ container.addEventListener("scroll", event => {
         ticking = true;
     }
 });
-*/
-
+/*
 container.addEventListener("scroll", event => {
 	const y	= container.scrollTop;
 	vscroll.setThumb(y);
 	fillData(y);
 });
+*/
+
 //-----------------------------------------------------------------------------
 //	columns
 //-----------------------------------------------------------------------------
@@ -417,10 +551,12 @@ function setActualColumns(columns, y) {
 
 	// update selection
 
-	if (selection_a >= 0) {
-		hex_selection.set(selection_a, selection_b, num_columns);
-		ascii_selection.set(selection_a, selection_b, num_columns);
+	if (state.selection.a >= 0) {
+		hex_selection.set(state.selection.a, state.selection.b, num_columns);
+		text_selection.set(state.selection.a, state.selection.b, num_columns);
 	}
+	for (const h of highlights)
+		h.update(num_columns);
 
 	//remove all address blocks
 
@@ -434,8 +570,8 @@ function setActualColumns(columns, y) {
 }
 
 window.addEventListener('resize', () => {
-	const columns	= auto_columns ? calcColumns() : num_columns;
-	const y			= calcScroll(last_top, columns);
+	const columns	= state.columns || calcColumns();
+	const y			= calcScroll(state.top, columns);
 	if (columns != num_columns)
 		setActualColumns(columns, y);
 	vscroll.setThumb(y);
@@ -444,45 +580,7 @@ window.addEventListener('resize', () => {
 });
 
 function setColumns(columns) {
-	if (auto_columns) {
-		if (columns) {
-			auto_columns = false;
-			hex_col.style.overflowX = 'visible';
-		}
-	} else if (columns === 0) {
-		auto_columns = true;
-		hex_col.style.overflowX = 'hidden';
-	}
-	return columns || calcColumns();
-}
-
-//-----------------------------------------------------------------------------
-//	radix
-//-----------------------------------------------------------------------------
-
-
-function getValueString(byte) {
-	return current_signed && byte >= 128
-		? '-' + (256 - byte).toString(current_radix).padStart(num_digits, '0')
-		: byte.toString(current_radix).padStart(num_digits, '0');
-}
-
-function setRadix(radix, signed) {
-	current_radix	= radix;
-	current_signed	= signed;
-	num_digits		= radix == 2 ? 8 : radix < 16 ? 3 : 2;
-	const digits	= num_digits + (signed ? 1 : 0);
-	hex_width		= digits * digit_width;
-	document.body.style.setProperty('--digits', digits.toString());
-
-	for (const i in state) {
-		if (state !== 'pending') {
-			const block	= hex_divs[i];
-			const data	= state[i];
-			for (let k = 0; k < data.length; k++)
-				block.children[k].textContent = getValueString(data[k]);
-		}
-	}
+//	text_col.style.overflowX = columns ? 'visible' : 'hidden';
 }
 
 //-----------------------------------------------------------------------------
@@ -538,33 +636,51 @@ function getBigUint(dv, len, littleEndian) {
 }
 
 function getBigInt(dv, len, littleEndian) {
-	const u = getBigUint(dv, len, true);
+	const u = getBigUint(dv, len, littleEndian);
 	const s = 1n << BigInt(len * 8);
 	return u < s >> 1n ? u : u - s;
 }
+
+function getOver(offset) {
+	if (offset >= state.selection.a && offset <= state.selection.b)
+		return true;//'{"selection": true}';
+
+	for (const h of highlights) {
+		if (h.contains(offset))
+			return h;//highlights.indexOf(h) + 2;//return '{"highlight": true}';
+	}
+}
+
 
 document.addEventListener('mouseenter', event => {
 	const span = event.target;
 	if (span && span.nodeName === 'SPAN') {
 		const offset	= getOffset(span);
+		const over		= getOver(offset);
+		hexview.dataset.vscodeContext = over ? (over === true ? '{"selection": true}' : '{"highlight": true}') : undefined;
 
-		if (offset >= selection_a && offset <= selection_b) {
-			hexview.dataset.vscodeContext = '{"selection": true}';
+		if (over instanceof Highlight) {
+			color_picker.classList.remove('invisible');
+			color_picker.style.left	= `${(over.a % num_columns) * hex_width}px`;
+			color_picker.style.top	= `${Math.floor(over.a / num_columns) * row_height}px`;
+			color_picker.value	= over.color.substring(0, 7);
+			current_highlight	= over;
 		} else {
-			delete hexview.dataset.vscodeContext;
+			color_picker.classList.add('invisible');
 		}
 
 		let tip;
-		if (selection_a >= 0 && (event.buttons & 1)) {
-			selection_b = offset;
-			hex_selection.set(selection_a, selection_b, num_columns);
-			ascii_selection.set(selection_a, selection_b, num_columns);
+		if (state.selection.a >= 0 && selecting) {
+			state.selection.b = offset;
+			hex_selection.set(state.selection.a, state.selection.b, num_columns);
+			text_selection.set(state.selection.a, state.selection.b, num_columns);
+			vscode.setState(state);
 
-			const start 	= Math.min(selection_a, selection_b), length = Math.abs(selection_a - selection_b) + 1;
-			tip 	= `0x${start.toString(16)} x ${length}`;
+			const start 	= Math.min(state.selection.a, state.selection.b), length = Math.abs(state.selection.a - state.selection.b) + 1;
+			tip 	= `selection: 0x${start.toString(16)} x ${length}`;
 
 			if (length < 32) {
-				const data		= new DataView(state[Math.floor(start / chunk_size)].buffer, start % chunk_size);
+				const data		= new DataView(chunks[Math.floor(start / chunk_size)].buffer, start % chunk_size);
 				const value	= getBigInt(data, length, little_endian);
 				tip += `:\ndecimal: ${value}`;
 
@@ -576,17 +692,17 @@ document.addEventListener('mouseenter', event => {
 			}
 
 		} else {
-			const byte = state[Math.floor(offset / chunk_size)][offset % chunk_size];
+			const byte = chunks[Math.floor(offset / chunk_size)]?.[offset % chunk_size];
 			if (byte !== undefined)
-				tip = `0x${offset.toString(16)}:\nbinary: ${byte.toString(2).padStart(8, '0')}\noctal: ${byte.toString(8).padStart(3, '0')}\ndecimal: ${byte.toString()}`;
+				tip = `address: 0x${offset.toString(16)}:\nbinary: 0b${getNumber(byte, 2, 8)}\noctal: 0${getNumber(byte, 8, 3)}\ndecimal: ${byte.toString()}\nhex: 0x${getNumber(byte, 16, 2)}`;
 		}
 
 		if (tip) {
 			tooltip.style.display = 'block';
-			tooltip.style.left = `${event.pageX + 10}px`;
-			tooltip.style.top = `${event.pageY + 10}px`;
-			tooltip.textContent = text;
-			const tooltipRect = tooltip.getBoundingClientRect();
+			tooltip.style.left	= `${event.pageX + 10}px`;
+			tooltip.style.top	= `${event.pageY + 10}px`;
+			tooltip.textContent = tip;
+			const tooltipRect	= tooltip.getBoundingClientRect();
 			if (tooltipRect.right > window.innerWidth)
 				tooltip.style.left = `${window.innerWidth - tooltipRect.width - 10}px`;
 		}
@@ -598,16 +714,28 @@ document.addEventListener('mouseleave', event => {
 }, true);
 
 document.addEventListener('mousedown', event => {
+	console.log('mousedown!');
+	if (event.target.tagName !== 'SPAN')
+		return;
+	
 	if (event.button === 0) {
-		selection_b = getOffset(event.target);
+		state.selection.b = getOffset(event.target);
 		if (!event.shiftKey)
-			selection_a = selection_b;
+			state.selection.a = state.selection.b;
 
-		hex_selection.set(selection_a, selection_b, num_columns);
-		ascii_selection.set(selection_a, selection_b, num_columns);
+		hex_selection.set(state.selection.a, state.selection.b, num_columns);
+		text_selection.set(state.selection.a, state.selection.b, num_columns);
+		vscode.setState(state);
 
 		tooltip.style.display = 'none';
+		selecting = true;
 	}
+	vscode.postMessage({command: 'click', offset: getOffset(event.target),  button: event.button});
+});
+
+document.addEventListener('mouseup', event => {
+	console.log('mouseup!');
+	selecting = false;
 });
 
 //-----------------------------------------------------------------------------
@@ -622,6 +750,16 @@ function stringToUint8Array(str) {
     return uint8Array;
 }
 
+function update() {
+	const columns = state.columns || calcColumns();
+	const y = calcScroll(state.top, columns);
+	setActualColumns(columns, y);
+	vscroll.setThumb(y);
+	hscroll.update();
+	fillData(y);
+}
+
+
 window.addEventListener('message', event => {
 	//event.stopPropagation();
 	const e = event.data;
@@ -630,49 +768,94 @@ window.addEventListener('message', event => {
 			if (e.total)
 				total = e.total;
 
-			if (e.radix)
-				setRadix(e.radix, e.signed);
-
-			const columns = setColumns(e.columns);
+			setText(state.text);
+			setRadix(state.radix);
+			setColumns(state.columns);
 
 			addr_col.textContent = '';
 			addr_col.appendChild(document.createElement("div"));	// spacer
 
-			const y = calcScroll(e.top, columns);
-			setActualColumns(columns, y);
-			vscroll.setThumb(y);
-			fillData(y);
+			update();
+
+			if (state.selection.a >= 0) {
+				hex_selection.set(state.selection.a, state.selection.b, num_columns);
+				text_selection.set(state.selection.a, state.selection.b, num_columns);
+			}
+	
+			for (const i of state.highlights) {
+				const h = new Highlight(i.a, i.b, i.color);
+				h.update(num_columns);
+				highlights.push(h);
+			}
 			break;
 		}
 
-		case 'columns': {
-			const columns = setColumns(e.columns);
-			const y	= calcScroll(last_top, columns);
-			setActualColumns(columns, y);
-			vscroll.setThumb(y);
-			fillData(y);
+		case 'top':
+			container.scrollTo({top: calcScroll(e.top, num_columns), behavior: 'smooth'});
 			break;
-		}
+
+		case 'columns':
+			setColumns(state.columns = e.columns);
+			vscode.setState(state);
+			update();
+			break;
 
 		case 'radix': {
-			setRadix(e.radix, e.signed);
+			setRadix(state.radix = e.radix);
+			vscode.setState(state);
+
+			for (const i in chunks) {
+				if (chunks !== 'pending')
+					fillHexChunk(hex_divs[i], chunks[i]);
+			}
+
+			update();
 			break;
 		}
 
+		case 'text':
+			setText(state.text = e.text);
+			vscode.setState(state);
+			for (const i in chunks) {
+				if (chunks !== 'pending')
+					fillTextChunk(text_divs[i], chunks[i]);
+			}
+			update();
+			break;
+	
 		case 'data': {
 			const offset = e.offset / chunk_size;
 			const count = e.data.length / chunk_size;
 			const data = stringToUint8Array(e.data);
 			for (let i = 0; i < count; i++) {
-				setTimeout(() => fillChunk(offset + i, data, i * chunk_size), 0);
+				setTimeout(() => fillChunk(offset + i, data.subarray(i * chunk_size, chunk_size)), 0);
 			}
 			break;
 		}
 
-		case 'getSelection': {
-			vscode.postMessage({command: 'selection', a:selection_a, b:selection_b});
+		case 'getState':
+			vscode.postMessage({command: 'state', state});
+			break;
+
+		case 'addHighlight': {
+			const h = new Highlight(e.a, e.b, e.color);
+			h.update(num_columns);
+			highlights.push(h);
+			state.highlights.push({a: e.a, b: e.b, color: e.color});
+			vscode.setState(state);
 			break;
 		}
-
+		case 'removeHighlight':
+			for (const h of highlights) {
+				if (h.contains(e.offset)) {
+					const i = highlights.indexOf(h);
+					h.remove();
+					highlights.splice(i, 1);
+					state.highlights.splice(i, 1);
+					vscode.setState(state);
+					break;
+				}
+			}
+			break;
 	}
 });

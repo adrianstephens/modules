@@ -21,6 +21,7 @@
 					"--extensionDevelopmentPath=${workspaceFolder}",
 					"D:\\dev\\shared\\"
 					//"D:\\dev\\vscode_ext\\registry"
+					//"D:\\dev\\vscode_ext\\vstools"
 				],
 			},
 			"osx": {

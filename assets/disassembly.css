@@ -1,0 +1,28 @@
+body {
+    line-height: 1.4;
+    margin: 0;
+}
+
+#root {
+    display: grid;
+    grid-template-columns: max-content minmax(0, max-content) max-content;
+    grid-auto-rows: 20px;
+    column-gap: 10px;
+    overflow: hidden;
+}
+span {
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.instruction {
+    display: grid;
+    grid-column: 1 / 4 ;
+    grid-template-columns: subgrid;
+}
+
+.label {
+    grid-column: 1 / 5;
+    font-weight: bold;
+    white-space: nowrap;
+}

@@ -1,6 +1,18 @@
-const vscode = acquireVsCodeApi();
+const state			= vscode.getState() || {};
+const vscroll 		= new ScrollBar(document.body, document.documentElement, false);
 
-document.addEventListener('DOMContentLoaded', () => vscode.postMessage({command: 'ready'}));
+document.addEventListener('DOMContentLoaded', () => {
+	vscode.postMessage({command: 'ready'});
+
+	const elements = document.getElementsByClassName('caret-down');
+	if (state?.open) {
+		Array.from(elements).forEach(e => e.classList.remove('caret-down'));
+		state.open.forEach(id => document.querySelector(id)?.classList.add('caret-down'));
+	} else {
+		state.open = Array.from(elements, element => generateUniqueId(element));
+		vscode.setState(state);
+	}
+});
 
 //function evaluate(expression) {
 //	if (expression.startsWith('calc('))
@@ -11,6 +23,14 @@ document.addEventListener('DOMContentLoaded', () => vscode.postMessage({command:
 document.querySelectorAll('.caret').forEach(caret => {
 	caret.addEventListener('click', event => {
 		caret.classList.toggle('caret-down');
+		if (caret.classList.contains('caret-down')) {
+			state.open.push(generateUniqueId(caret));
+		} else {
+			const index = state.open.indexOf(generateUniqueId(caret));
+			if (index !== -1)
+				state.open.splice(index, 1);
+		}
+		vscode.setState(state);
 		event.stopPropagation();
 	});
 });
@@ -24,10 +44,13 @@ function isStuck(e) {
 
 let prev_stuck;
 document.addEventListener("scroll", event => {
+	vscroll.update();
+	const x = document.querySelector('.tree').clientWidth - 20;
+	
 	let i = 0;
 	let last_stuck;
 	for(;;) {
-		const e = document.elementFromPoint(i * 20 + 70, i * 20 + 10);
+		const e = document.elementFromPoint(x, i * 22 + 10);
 		if (!isStuck(e))
 			break;
 		last_stuck = e;
@@ -58,11 +81,27 @@ document.querySelectorAll('.children > div').forEach(item => {
 */
 document.querySelectorAll('.binary').forEach(item => {
 	item.addEventListener('click', event => {
-		vscode.postMessage({
-			command: 'binary',
-			offset: event.target?.dataset.offset,
-			length: event.target?.dataset.length,
-		})
-		event.stopPropagation();
+		const dataset = event.target?.dataset;
+		if (dataset) {
+			vscode.postMessage({
+				command: 'binary',
+				name: getFirstText(event.target),
+				...dataset
+			})
+			event.stopPropagation();
+		}
 	});
 });
+
+document.querySelectorAll('.path > span').forEach(item => {
+	item.addEventListener('click', event => {
+		if (event.offsetX > 20) {
+			vscode.postMessage({
+				command: 'path',
+				path: item.textContent
+			})
+			event.stopPropagation();
+		}
+	});
+});
+

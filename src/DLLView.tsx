@@ -1,7 +1,9 @@
 import * as vscode from 'vscode';
-import {jsx, fragment, codicons, Icon} from "./modules/jsx";
-import {PE, DIRECTORIES} from "./modules/pe";
-import {SubfileFileSystem} from './extension';
+import {DebugProtocol} from '@vscode/debugprotocol';
+import {jsx, fragment, codicons, Icon} from "./shared/jsx";
+import {PE, DIRECTORIES, RVAdata, DLLImports} from "./shared/pe";
+import {DisassemblyView} from "./DisassemblyView";
+import * as main from "./extension";
 
 type IconType0	= string | vscode.Uri;
 type IconType	= IconType0 | vscode.ThemeIcon | {
@@ -9,10 +11,12 @@ type IconType	= IconType0 | vscode.ThemeIcon | {
 	dark:	IconType0;
 };
 
-const icon_file = new vscode.ThemeIcon('file', new vscode.ThemeColor('charts.blue'));
+const folder = new vscode.ThemeIcon('folder', new vscode.ThemeColor('charts.blue'));
+const icon_group = new vscode.ThemeIcon('circleLargeFilled', new vscode.ThemeColor('charts.blue'));
 const icon_binary = new vscode.ThemeIcon('fileBinary', new vscode.ThemeColor('charts.green'));
-const icon_number = new vscode.ThemeIcon('symbolNumber', new vscode.ThemeColor('charts.red'));
-const icon_item = 'circle';
+//const icon_number = new vscode.ThemeIcon('symbolNumber', new vscode.ThemeColor('charts.red'));
+//const icon_number = new vscode.ThemeIcon('circleSmallFilled', new vscode.ThemeColor('charts.red'));
+const icon_item = 'circleSmallFilled';
 
 
 function getIcon0(icon: IconType0) {
@@ -40,10 +44,10 @@ function Icon2(props: {icon: IconType}) {
 	);
 }
 
-function TreeParent(props: {name: string, icon: IconType, open?: boolean}, ...children: any[]) {
-	return <div class={props.open ? "caret caret-down" : "caret"}>
+function TreeParent(props: {name: string, icon?: IconType, open?: boolean, path?: boolean}, ...children: any[]) {
+	return <div class={'caret' + (props.open ? ' caret-down' : '') + (props.path ? ' path' : '')}>
 		<span>
-			<Icon2 icon={props.icon}/>
+			{props.icon && <Icon2 icon={props.icon}/>}
 			{props.name}
 		</span>
 		<div class="children">
@@ -52,23 +56,37 @@ function TreeParent(props: {name: string, icon: IconType, open?: boolean}, ...ch
 	</div>;
 }
 
+function hasCustomToString(value: any): boolean {
+    return value && value.toString !== Object.prototype.toString;
+}
+
 function TreeItem(props: {name: string, value: any}) {
 	const {name, value} = props;
 	switch (typeof value) {
 		case 'object':
-			if (value instanceof Buffer) {
+			if (value instanceof RVAdata && value.data) {
+				return <div class='binary' data-offset={value.data!.byteOffset} data-length={value.data!.byteLength} data-va={value.va} data-exec={value.characteristics?.MEM_EXECUTE}>
+					<Icon2 icon={icon_binary}/>
+					{`${name}: 0x${value.va.toString(16)}[0x${value.data!.byteLength.toString(16)}]`}
+				</div>;
+			} else if (value instanceof Buffer) {
 				return <div class='binary' data-offset={value.byteOffset} data-length={value.length}>
 					<Icon2 icon={icon_binary}/>
 					{`${name}: 0x${value.byteOffset.toString(16)}[${value.length}]`}
 				</div>;
+			} else if (!(0 in value) && hasCustomToString(value)) {
+				return <div>
+					<Icon2 icon={icon_item}/>
+					{`${name}: ${value}`}
+				</div>;
 			} else {
-				return <TreeParent name={props.name} icon={icon_file}>
+				return <TreeParent name={props.name} path={value instanceof DLLImports}>
 					{Object.entries(value).map(([name, value]) => <TreeItem name={name} value={value}/> )}
 				</TreeParent>
 			}
-		case 'number':
-		case 'bigint':
-			return <div><Icon2 icon={icon_number}/>{`${name}: ${value}`}</div>;
+		//case 'number':
+		//case 'bigint':
+		//	return <div><Icon2 icon={icon_number}/>{`${name}: ${value}`}</div>;
 
 		default:
 			return <div><Icon2 icon={icon_item}/> {`${name}: ${value}`}</div>;
@@ -90,15 +108,19 @@ class DLLDocument extends PE implements vscode.CustomDocument {
 export class DllEditorProvider implements vscode.CustomReadonlyEditorProvider {
 	private receive?: vscode.Disposable;
 
-	getUri(webview: vscode.Webview, name: string) {
-		return webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'assets', name));
-	}
-
 	constructor(private context: vscode.ExtensionContext) {
+		context.subscriptions.push(vscode.window.registerCustomEditorProvider('modules.dllView', this));
 	}
 
 	async openCustomDocument(uri: vscode.Uri, openContext: vscode.CustomDocumentOpenContext, token: vscode.CancellationToken): Promise<vscode.CustomDocument> {
-		return new DLLDocument(uri, await vscode.workspace.fs.readFile(uri));
+		const data = await vscode.workspace.fs.readFile(uri).then(
+			data => data,
+			err => {
+				vscode.window.showErrorMessage(err.message);
+				throw err;
+			}
+		);
+		return new DLLDocument(uri, data);
 	}
 
 	async resolveCustomEditor(dll: DLLDocument, webviewPanel: vscode.WebviewPanel, token: vscode.CancellationToken): Promise<void> {
@@ -114,35 +136,38 @@ export class DllEditorProvider implements vscode.CustomReadonlyEditorProvider {
 				<head>
 					<meta charset="UTF-8"/>
 					<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-					<link rel="stylesheet" type="text/css" href={this.getUri(webview, 'treeview.css')}/>
+					<link rel="stylesheet" type="text/css" href={main.webviewUri(this.context, webview, 'shared.css')}/>
+					<link rel="stylesheet" type="text/css" href={main.webviewUri(this.context, webview, 'treeview.css')}/>
 				</head>
 				<body>
 
 				<div class="tree">
 					<TreeParent name={dll.uri.fsPath} icon={'file'} open={true}>
-						<TreeParent name="Header" icon={'folder'}>
+						<TreeParent name="Header" icon={folder}>
 							{TreeChildren(dll.header)}
 						</TreeParent>
 
-						<TreeParent name="Opt Header" icon={'file'}>
+						<TreeParent name="Opt Header" icon={folder}>
 							{TreeChildren(dll.opt!)}
 						</TreeParent>
 
-						<TreeParent name="Sections" icon={'file'} open={true}>
-							{dll.sections.map(s => <TreeParent name={s.Name} icon="file">
-								<TreeItem name="VirtualAddress" value={s.VirtualAddress}/>
-								<TreeItem name="data" value= {dll.SectionData(s)}/>
-							</TreeParent>)}
+						<TreeParent name="Sections" icon={folder} open={true}>
+							{dll.sections.map(s =>
+								<TreeParent name={s.Name} icon="file">
+									<TreeItem name='data' value={new RVAdata(s.VirtualAddress, dll.SectionData(s), s.Characteristics)}/>
+									<TreeItem name='characteristics' value={s.Characteristics}/>
+								</TreeParent>
+							)}
 						</TreeParent>
 						
-						<TreeParent name="Directories" icon={'file'} open={true}>
+						<TreeParent name="Directories" icon={folder} open={true}>
 							{Object.entries(dll.directories!).filter(s => s[1].Size).map(s => {
 								const read		= DIRECTORIES[s[0]]?.read;
 								const data		= dll.GetDataDir(s[1]);
 								return <TreeParent name={s[0]} icon="file">
 									{read
 										? TreeChildren(read(dll, data!, s[1].VirtualAddress))
-										: TreeChildren({VirtualAddress: s[1].VirtualAddress, data})
+										: <TreeItem name='data' value={new RVAdata(s[1].VirtualAddress, data, dll.FindSectionRVA(s[1].VirtualAddress)?.Characteristics)}/>
 									}
 								</TreeParent>
 							})}
@@ -151,18 +176,59 @@ export class DllEditorProvider implements vscode.CustomReadonlyEditorProvider {
 					</TreeParent>
 				</div>
 
-				<script src={this.getUri(webview, 'treeview.js')}></script>
+				<script src={main.webviewUri(this.context, webview, 'shared.js')}></script>
+				<script src={main.webviewUri(this.context, webview, 'treeview.js')}></script>
 			</body></html>;
 
 		this.receive = webview.onDidReceiveMessage(async message => {
 			switch (message.command) {
 				case 'binary': {
-                    const uri = SubfileFileSystem.make(dll.uri, message.offset, message.length);
-					//const uri = dll.uri.with({query: `baseAddress=${message.offset}`})
-					vscode.commands.executeCommand('vscode.openWith', uri, 'hexEditor.hexedit', {preview: true, viewColumn: vscode.ViewColumn.Beside});
+					const length	= +message.length;
+					const session	= vscode.debug.activeDebugSession;
+					if (session) {
+						const modules = await vscode.commands.executeCommand("modules.getModules") as DebugProtocol.Module[];
+						const path = dll.uri.fsPath.toLowerCase();
+						for (const i of modules) {
+							if (i.path?.toLowerCase() === path) {
+								const address = +(i.addressRange ?? 0) + +message.va;
+								if ('exec' in message) {
+									new DisassemblyView(this.context, session, address, length, `Disassembly @ 0x${address.toString(16)}`, vscode.ViewColumn.Beside);
+								} else {
+									const uri = main.DebugMemoryFileSystem.makeUri(session, `0x${address.toString(16)}`, {fromOffset: 0, toOffset: length});
+									vscode.commands.executeCommand('vscode.openWith', uri, 'hex.view', {preview: true, viewColumn: vscode.ViewColumn.Beside});
+								}
+								return;
+							}
+						}
+					}
+			
+					const offset	= +message.offset;
+					
+					const file = main.withOffset(await main.NormalFile.open(dll.uri), {fromOffset: offset, toOffset: offset + length})
+					vscode.commands.executeCommand('hex.open', file, message.name ?? "binary", vscode.ViewColumn.Beside);
+					
+					//const uri = dll.uri.with({query: `baseAddress=${offset}`})
+					//vscode.commands.executeCommand('vscode.openWith', uri, 'hexEditor.hexedit', {preview: true, viewColumn: vscode.ViewColumn.Beside});
+					//const uri = main.SubfileFileSystem.makeUri(dll.uri, offset, length);
 					//vscode.commands.executeCommand('vscode.openWith', uri, 'hex.view', {preview: true, viewColumn: vscode.ViewColumn.Beside});
 					break;
 				}
+				case 'path': {
+					console.log(message.path);
+					const session = vscode.debug.activeDebugSession;
+					if (session) {
+						const modules = await vscode.commands.executeCommand("modules.getModules") as DebugProtocol.Module[];
+						const path = message.path.toLowerCase();
+						for (const i of modules) {
+							if (i.path && i.name.toLowerCase() === path) {
+								vscode.commands.executeCommand('vscode.open', vscode.Uri.file(i.path));
+								return;
+							}
+						}
+					}
+					break;
+				}
+
 			}
 		});
 

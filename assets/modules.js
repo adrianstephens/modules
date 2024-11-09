@@ -1,10 +1,19 @@
-const vscode = acquireVsCodeApi();
-
 let sort_column = -1;
 let sort_direction = 1;
 
-const table = document.querySelector('table');
-const cols  = table.querySelectorAll('th');
+const table 	= document.querySelector('table');
+const cols  	= table.querySelectorAll('th');
+
+const vscroll 	= new ScrollBar(document.body, document.documentElement, false);
+const hscroll 	= new ScrollBar(document.body, document.documentElement, true);
+
+window.addEventListener('resize', () => {
+	vscroll.update();
+	hscroll.update();
+});
+window.addEventListener("scroll", () => {
+	vscroll.update();
+});
 
 function initPathWidths() {
 	const paths = document.querySelectorAll('td.path');
@@ -193,6 +202,7 @@ window.addEventListener('message', event => {
 			const d = document.getElementById(event.data.dest);
 
 			template(t, d, event.data.values);
+			hscroll.update();
 		}
 
 	}

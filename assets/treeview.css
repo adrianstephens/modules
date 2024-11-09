@@ -1,25 +1,7 @@
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, 'Ubuntu', 'Droid Sans', sans-serif;
-    font-size: 13px;
-    line-height: 1.4;
-    color: var(--vscode-foreground);
-    margin: 0;
+    line-height: 22px;
     --depth: 0;
     --depth2: 0;
-}
-
-.codicon {
-	font: normal normal normal 16px/1 codicon;
-	display: inline-block;
-	text-decoration: none;
-	text-rendering: auto;
-	text-align: center;
-	-webkit-font-smoothing: antialiased;
-	-moz-osx-font-smoothing: grayscale;
-	user-select: none;
-	-webkit-user-select: none;
-	-ms-user-select: none;
-    margin-right: 4px;
 }
 
 .tree {
@@ -29,23 +11,26 @@ body {
 
 .children {
     --depth2: var(--depth);
+    padding-left: 20px;
 }
 
 .caret {
     --depth: calc(var(--depth2) + 1);
     cursor: pointer;
     user-select: none;
+    /*pointer-events: none;*/
 
     & > span::before {
         font-family: 'codicon';
         content: '\eab6';
         display: inline-block;
         margin-right: 6px;
+        pointer-events: auto;
     }
 
     &.caret-down > span {
         position: sticky;
-        top: calc((var(--depth) - 1) * 20px);
+        top: calc((var(--depth) - 1) * 22px);
         background-color: var(--vscode-editor-background);
         z-index: calc(1000 - var(--depth));
         display: inline-block;
@@ -57,8 +42,8 @@ body {
         }
     }
 
-    & > div {
-        padding-left: 20px;
+    &:has(> span:first-child > .codicon) > .children {
+        padding-left: 32px;
     }
 }
 
@@ -68,4 +53,8 @@ body {
 
 .caret:not(.caret-down) div {
     display: none;
+}
+
+.path > span:hover {
+    text-decoration: underline;
 }
