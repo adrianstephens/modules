@@ -63,13 +63,15 @@ function hasCustomToString(value: any): boolean {
 function TreeItem(props: {name: string, value: any}) {
 	const {name, value} = props;
 	switch (typeof value) {
+		case 'undefined':
+			return;
 		case 'object':
 			if (value instanceof RVAdata && value.data) {
 				return <div class='binary' data-offset={value.data!.byteOffset} data-length={value.data!.byteLength} data-va={value.va} data-exec={value.characteristics?.MEM_EXECUTE}>
 					<Icon2 icon={icon_binary}/>
 					{`${name}: 0x${value.va.toString(16)}[0x${value.data!.byteLength.toString(16)}]`}
 				</div>;
-			} else if (value instanceof Buffer) {
+			} else if (value instanceof Uint8Array) {
 				return <div class='binary' data-offset={value.byteOffset} data-length={value.length}>
 					<Icon2 icon={icon_binary}/>
 					{`${name}: 0x${value.byteOffset.toString(16)}[${value.length}]`}
@@ -203,8 +205,7 @@ export class DllEditorProvider implements vscode.CustomReadonlyEditorProvider {
 					}
 			
 					const offset	= +message.offset;
-					
-					const file = main.withOffset(await main.NormalFile.open(dll.uri), {fromOffset: offset, toOffset: offset + length})
+					const file		= main.withOffset(await main.NormalFile.open(dll.uri), {fromOffset: offset, toOffset: offset + length});
 					vscode.commands.executeCommand('hex.open', file, message.name ?? "binary", vscode.ViewColumn.Beside);
 					
 					//const uri = dll.uri.with({query: `baseAddress=${offset}`})

@@ -24,8 +24,12 @@ export class DisassemblyView {
 	labels: number[] = [];
 	
 	constructor(private context: vscode.ExtensionContext, private session: vscode.DebugSession, private address:number, length:number, title: string, column: vscode.ViewColumn) {
-		const panel = vscode.window.createWebviewPanel("modules.disassenbly", title, column, { enableScripts: true });
-		
+		const panel = vscode.window.createWebviewPanel("modules.disassembly", title, column, { enableScripts: true });
+
+		main.DebugSession.get_wrapper(session.id).onDidChangeState(state => {
+			if (state === main.State.Inactive)
+				panel.dispose();
+		});
 
 		panel.webview.html = "<!DOCTYPE html>" + <html lang="en">
 			<head>

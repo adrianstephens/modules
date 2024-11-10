@@ -246,22 +246,6 @@ export class HexEditorProvider implements vscode.CustomReadonlyEditorProvider {
 		HexEditorProvider.me = this;
 		context.subscriptions.push(vscode.window.registerCustomEditorProvider('hex.view', this));
 
-		// close tabgroups
-		const closeTabGroups = context.workspaceState.get<number[]>('closeTabGroups', []);
-		closeTabGroups.forEach(i => {
-			const group = main.getTabGroup(i);
-			if (group)
-				vscode.window.tabGroups.close(group);
-		});
-	
-		// monitor tabgroups
-		context.subscriptions.push(vscode.window.tabGroups.onDidChangeTabGroups((e: vscode.TabGroupChangeEvent) => {
-			const closeTabGroups = vscode.window.tabGroups.all.filter(group =>
-				group.tabs.length && group.tabs.every(tab => tab.input instanceof vscode.TabInputWebview && tab.input.viewType === 'mainThreadWebview-hex.view')
-			).map(group => group.viewColumn);
-			context.workspaceState.update('closeTabGroups', closeTabGroups);
-		}));
-				
 		this.status = {
 			address:	createStatusBarItem('0x', 'hex.goto', 'Goto address'),
 			radix:		createStatusBarItem('Radix: 16', 'hex.radix', 'Select the radix'),
@@ -295,6 +279,7 @@ export class HexEditorProvider implements vscode.CustomReadonlyEditorProvider {
 					column	= p1;
 					p1		= params.shift();
 				}
+
 				const webviewPanel	= vscode.window.createWebviewPanel("hex.view", title, column);
 				this.openEditor(p0, webviewPanel);
 			}

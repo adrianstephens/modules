@@ -7,6 +7,8 @@ import {ModuleWebViewProvider} from "./ModulesView";
 import {DllEditorProvider} from "./DLLView";
 import {HexEditorProvider} from "./HexView";
 import * as telemetry from "./telemetry";
+import "./shared/clr";
+//import * as zlib from "zlib";
 
 const connectionString = 'InstrumentationKey=a5c3fd08-7ea0-4e3e-880b-6ad15f12e218;IngestionEndpoint=https://eastus-8.in.applicationinsights.azure.com/;LiveEndpoint=https://eastus.livediagnostics.monitor.azure.com/;ApplicationId=1b2b09f8-a9d1-47ff-a545-db7b32df8510';
 
@@ -30,12 +32,12 @@ export function getTabGroup(column: number) {
 //	DebugSession(s)
 //-----------------------------------------------------------------------------
 
-export const State = {
-	Inactive:		0,
-	Initializing:	1,
-	Stopped:		2,
-	Running:		3
-} as const;
+export const enum State {
+	Inactive		= 0,
+	Initializing	= 1,
+	Stopped			= 2,
+	Running			= 3
+}
 
 export class DebugSession implements vscode.DebugAdapterTracker {
 	static sessions: Record<string, DebugSession> = {};
@@ -505,6 +507,26 @@ interface ViewMemory {
 }
 
 export function activate(context: vscode.ExtensionContext) {
+	// close unwanted tabgroups
+	const closeTabGroups = context.workspaceState.get<number[]>('closeTabGroups', []);
+	closeTabGroups.forEach(i => {
+		const group = getTabGroup(i);
+		if (group)
+			vscode.window.tabGroups.close(group);
+	});
+
+	// monitor tabgroups
+	const closeTypes = new Set([
+		"mainThreadWebview-modules.disassembly",
+		"mainThreadWebview-hex.view"],
+	);
+	context.subscriptions.push(vscode.window.tabGroups.onDidChangeTabGroups((e: vscode.TabGroupChangeEvent) => {
+		const closeTabGroups = vscode.window.tabGroups.all.filter(group =>
+			group.tabs.length && group.tabs.every(tab => tab.input instanceof vscode.TabInputWebview && closeTypes.has(tab.input.viewType))
+		).map(group => group.viewColumn);
+		context.workspaceState.update('closeTabGroups', closeTabGroups);
+	}));
+	
 	context.subscriptions.push(telemetry.init(connectionString));
 
 	//override for debug
@@ -531,7 +553,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	new DebugSource(context);
 
-	new HexEditorProvider(context);
+	new HexEditorProvider(context);				
 }
 
 export function deactivate() {
