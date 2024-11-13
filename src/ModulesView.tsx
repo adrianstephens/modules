@@ -177,7 +177,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 						//const uri = main.DebugMemory.makeUri(this.session, m.addressRange, undefined, m.name);
 						//await vscode.commands.executeCommand('vscode.openWith', uri, 'hexEditor.hexedit', {preview: true});
 						const uri = main.DebugMemoryFileSystem.makeUri(this.session, m.addressRange, undefined, m.name);
-						await vscode.commands.executeCommand('vscode.openWith', uri, 'hex.view', {preview: true});
+						vscode.commands.executeCommand('vscode.openWith', uri, 'hex.view', {preview: true});
 
 					} else if (this.session && m.sourceReference) {
 						main.openPreview(main.DebugSource.makeUri(this.session, m.sourceReference, path.extname(m.name) ? m.name : m.name + '.js'));
@@ -186,8 +186,20 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 					}
 					break;
 				}
+				case 'path': {
+					const m = this.modules[message.id];
+					if (m.path && await vscode.workspace.fs.stat(vscode.Uri.file(m.path)).then(()=>true, ()=>false)) {
+						vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(m.path), 'modules.dylibView', {preview: true});
+					} else if (this.session && m.addressRange) {
+						const uri = main.DebugMemoryFileSystem.makeUri(this.session, m.addressRange, {fromOffset:0, toOffset:m.vsModuleSize}, m.name);
+						vscode.commands.executeCommand('vscode.openWith', uri, 'modules.dylibView', {preview: true});
+					}
+					break;
+				}
 				case 'open': {
-					vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.path));
+					if (await vscode.workspace.fs.stat(vscode.Uri.file(message.path)).then(()=>true, ()=>false)) {
+						vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.path));
+					}
 					break;
 				}
 
@@ -275,7 +287,14 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 		const has_col	= modules.reduce((cols, m) => (Object.keys(m).forEach(k => cols.add(k)), cols), new Set<string>());
 
 		this.tele.combine(1000, () => telemetry.send('view.update', {type: this.session?.type || 'unknown', cols: Array.from(has_col.keys()).join(', '), rows: modules.length}));
-
+/*
+		if (has_col.has('path')) {
+			Object.values(modules).forEach(m => {
+				if (m.path && !path.extname(m.path))
+					m.path += '.dylib';
+			});
+		}
+*/
 		if (has_col.has('vsLoadAddress')) {
 			has_col.delete('vsLoadAddress');
 			Object.values(modules).forEach(m => {

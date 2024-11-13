@@ -42,6 +42,13 @@
 				]
 			},
 			{
+				"viewType": "modules.dylibView",
+				"displayName": "Dylib Viewer",
+				"selector": [
+					{"filenamePattern": "*.dylib"}
+				]
+			},
+			{
 				"viewType": "hex.view",
 				"displayName": "Hex Viewer",
 				"selector": [

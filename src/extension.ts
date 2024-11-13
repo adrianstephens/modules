@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as utils from './shared/utils';
 import {DebugProtocol} from '@vscode/debugprotocol';
 import {ModuleWebViewProvider} from "./ModulesView";
-import {DllEditorProvider} from "./DLLView";
+import {DllEditorProvider, DyLibEditorProvider} from "./DLLView";
 import {HexEditorProvider} from "./HexView";
 import * as telemetry from "./telemetry";
 import "./shared/clr";
@@ -126,6 +126,60 @@ export function isFile(obj: any): obj is File {
 	return obj && typeof obj.dispose === 'function' && typeof obj.read === 'function' && typeof obj.write === 'function';
 }
 
+interface FileSystem extends vscode.FileSystemProvider {
+	openFile(uri: vscode.Uri): File | Promise<File>;
+}
+const filesystems: Record<string,FileSystem> = {};
+
+abstract class BaseFileSystem implements FileSystem {
+	protected _onDidChangeFile = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
+	readonly onDidChangeFile: vscode.Event<vscode.FileChangeEvent[]> = this._onDidChangeFile.event;
+
+    constructor(context: vscode.ExtensionContext, scheme: string) {
+        filesystems[scheme] = this;
+		context.subscriptions.push(vscode.workspace.registerFileSystemProvider(scheme, this, { isCaseSensitive: true }));
+    }
+
+    // Abstract method that must be implemented
+    abstract openFile(uri: vscode.Uri): File | Promise<File>;
+    abstract readFile(uri: vscode.Uri): Uint8Array | Thenable<Uint8Array>;
+
+	//stubs
+	watch(uri: vscode.Uri, options: { readonly recursive: boolean; readonly excludes: readonly string[]; }): vscode.Disposable { throw 'not implemented'; }
+	stat(uri: vscode.Uri): vscode.FileStat | Thenable<vscode.FileStat> { throw 'not implemented'; }
+	readDirectory(uri: vscode.Uri): [string, vscode.FileType][] { throw 'not implemented'; }
+	createDirectory(uri: vscode.Uri)  { throw 'not implemented'; }
+	writeFile(uri: vscode.Uri, content: Uint8Array, options: { readonly create: boolean; readonly overwrite: boolean; })  { throw 'not implemented'; }
+	delete(uri: vscode.Uri, options: { readonly recursive: boolean; }): void  { throw 'not implemented'; }
+	rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { readonly overwrite: boolean; })  { throw 'not implemented'; }
+}
+
+export function withOffset(file: File, offset: FileRange) {
+	return new class implements File {
+		length = offset.toOffset - offset.fromOffset;
+		dispose() { file.dispose(); }
+		read(pos: number, length: number) {
+			const start = pos + offset.fromOffset;
+			const end	= Math.min(start + length, offset.toOffset);
+			return file.read(start, end - start);
+		}
+		write(pos: number, data: Uint8Array) {
+			const start = pos + offset.fromOffset;
+			const end	= Math.min(start + data.length, offset.toOffset);
+			return file.write(start, data.subarray(0, end - start));
+		}
+	};
+}
+
+export function openFile(uri: vscode.Uri) {
+	switch (uri.scheme) {
+		case 'file':
+			return NormalFile.open(uri);
+		default:
+			return filesystems[uri.scheme]?.openFile(uri);
+	}
+}
+
 export class NormalFile implements File {
 	constructor(public fd:number) {}
 
@@ -165,22 +219,6 @@ export class NormalFile implements File {
 	}
 }
 
-export function withOffset(file: File, offset: FileRange) {
-	return new class implements File {
-		length = offset.toOffset - offset.fromOffset;
-		dispose() { file.dispose(); }
-		read(pos: number, length: number) {
-			const start = pos + offset.fromOffset;
-			const end	= Math.min(start + length, offset.toOffset);
-			return file.read(start, end - start);
-		}
-		write(pos: number, data: Uint8Array) {
-			const start = pos + offset.fromOffset;
-			const end	= Math.min(start + data.length, offset.toOffset);
-			return file.write(start, data.subarray(0, end - start));
-		}
-	};
-}
 
 function getEncapsulatedUri(uri: vscode.Uri) {
 	return uri.with({
@@ -190,41 +228,27 @@ function getEncapsulatedUri(uri: vscode.Uri) {
 //	return vscode.Uri.parse(uri.fsPath);
 }
 
-class ReadOnlyFilesystem implements vscode.FileSystemProvider {
+class ReadOnlyFilesystem extends BaseFileSystem {
 	static SCHEME = 'readonly';
 
-	private _onDidChangeFile = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
-	readonly onDidChangeFile: vscode.Event<vscode.FileChangeEvent[]> = this._onDidChangeFile.event;
-
 	constructor(context: vscode.ExtensionContext) {
-		context.subscriptions.push(vscode.workspace.registerFileSystemProvider(ReadOnlyFilesystem.SCHEME, this, { isCaseSensitive: true }));
-	}
-
-	watch(uri: vscode.Uri, options: { readonly recursive: boolean; readonly excludes: readonly string[]; }) {
-		return new vscode.Disposable(() => { });
+		super(context, ReadOnlyFilesystem.SCHEME);
 	}
 
 	stat(uri: vscode.Uri) {
 		return vscode.workspace.fs.stat(getEncapsulatedUri(uri)).then(stat => {stat.permissions = vscode.FilePermission.Readonly; return stat; });
 	}
 
+	openFile(uri: vscode.Uri) {
+		return NormalFile.open(getEncapsulatedUri(uri));
+	}
 	readFile(uri: vscode.Uri) {
 		return vscode.workspace.fs.readFile(getEncapsulatedUri(uri));
 	}
-
-	//stubs
-	readDirectory(uri: vscode.Uri) { return []; }
-	createDirectory(uri: vscode.Uri) {}
-	writeFile(uri: vscode.Uri, content: Uint8Array, options: { readonly create: boolean; readonly overwrite: boolean; }) {}
-	delete(uri: vscode.Uri, options: { readonly recursive: boolean; }) {}
-	rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { readonly overwrite: boolean; }) {}
 }
 
-export class SubfileFileSystem implements vscode.FileSystemProvider {
+export class SubfileFileSystem extends BaseFileSystem {
 	static SCHEME = 'subfile';
-
-	private _onDidChangeFile = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
-	readonly onDidChangeFile: vscode.Event<vscode.FileChangeEvent[]> = this._onDidChangeFile.event;
 
 	static makeUri(uri: vscode.Uri, offset:number, length:number) {
 		return uri.with({
@@ -242,13 +266,7 @@ export class SubfileFileSystem implements vscode.FileSystemProvider {
 	}
 	
 	constructor(context: vscode.ExtensionContext) {
-		context.subscriptions.push(vscode.workspace.registerFileSystemProvider(SubfileFileSystem.SCHEME, this, { isCaseSensitive: true }));
-	}
-
-	watch(uri: vscode.Uri, options: { readonly recursive: boolean; readonly excludes: readonly string[]; }) {
-		return new vscode.Disposable(()=>{});
-		//({uri} = SubfileFileSystem.parseUri(uri));
-		//return vscode.workspace.fs.watch(uri);
+		super(context, SubfileFileSystem.SCHEME);
 	}
 
 	stat(uri: vscode.Uri) {
@@ -258,9 +276,6 @@ export class SubfileFileSystem implements vscode.FileSystemProvider {
 			return stat;
 		});
 	}
-
-	readDirectory(uri: vscode.Uri) { return []; }
-	createDirectory(uri: vscode.Uri) {}
 
 	async readFile(uri: vscode.Uri) {
 		const { uri: uri2, offset } = SubfileFileSystem.parseUri(uri);
@@ -276,13 +291,10 @@ export class SubfileFileSystem implements vscode.FileSystemProvider {
 			return data.subarray(offset.fromOffset, offset.toOffset);
 		}
 	}
-	writeFile(uri: vscode.Uri, content: Uint8Array, options: { readonly create: boolean; readonly overwrite: boolean; }) {}
-	delete(uri: vscode.Uri, options: { readonly recursive: boolean; }) {}
-	rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { readonly overwrite: boolean; }) {}
-
-	open(uri: vscode.Uri) {
+	async openFile(uri: vscode.Uri) {
 		const { uri: uri2, offset } = SubfileFileSystem.parseUri(uri);
-		return NormalFile.open(uri2).then(file => withOffset(file, offset));
+		const file = await openFile(uri2);
+		return withOffset(file, offset);
 	}
 }
 
@@ -311,12 +323,8 @@ class DebugMemoryFile implements File {
 	}
 }
 
-export class DebugMemoryFileSystem implements vscode.FileSystemProvider {
+export class DebugMemoryFileSystem extends BaseFileSystem {
 	static SCHEME = 'modules-debug-memory';
-	static me:	DebugMemoryFileSystem;
-
-	private _onDidChangeFile = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
-	readonly onDidChangeFile: vscode.Event<vscode.FileChangeEvent[]> = this._onDidChangeFile.event;
 
 	static makeUri(session: vscode.DebugSession, memoryReference: string, range?: FileRange, displayName = 'memory') {
 		return vscode.Uri.from({
@@ -345,11 +353,10 @@ export class DebugMemoryFileSystem implements vscode.FileSystemProvider {
 	}
 
 	constructor(context: vscode.ExtensionContext) {
-		DebugMemoryFileSystem.me = this;
-		context.subscriptions.push(vscode.workspace.registerFileSystemProvider(DebugMemoryFileSystem.SCHEME, this, { isCaseSensitive: true }));
+		super(context, DebugMemoryFileSystem.SCHEME);
 	}
 
-	open(uri: vscode.Uri): DebugMemoryFile {
+	openFile(uri: vscode.Uri): DebugMemoryFile {
 		const { session, memoryReference } = DebugMemoryFileSystem.parseUri(uri);
 		return new DebugMemoryFile(session.session, memoryReference);
 	}
@@ -407,12 +414,6 @@ export class DebugMemoryFileSystem implements vscode.FileSystemProvider {
 			file.dispose();
 		}
 	}
-
-//stubs
-	readDirectory(uri: vscode.Uri) { return []; }
-	createDirectory(uri: vscode.Uri) {}
-	delete(uri: vscode.Uri, options: { readonly recursive: boolean; }) {}
-	rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { readonly overwrite: boolean; }) {}
 }
 
 //-----------------------------------------------------------------------------
@@ -546,6 +547,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	new ModuleWebViewProvider(context);
 	new DllEditorProvider(context);
+	new DyLibEditorProvider(context);
 	
 	new ReadOnlyFilesystem(context);
 	new SubfileFileSystem(context);

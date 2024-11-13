@@ -401,13 +401,16 @@ export class HexEditorProvider implements vscode.CustomReadonlyEditorProvider {
 
 	async openCustomDocument(uri: vscode.Uri, openContext: vscode.CustomDocumentOpenContext, token: vscode.CancellationToken): Promise<vscode.CustomDocument> {
 		try {
+			const stat = await vscode.workspace.fs.stat(uri);
+			const file = await main.openFile(uri);
+			if (file)
+				return new HexVirtualDocument(uri, stat.size, file);
+/*
 			if (uri.scheme === 'file') {
-				const stat = await vscode.workspace.fs.stat(uri);
 				if (stat.size > 0x10000)
 					return new HexVirtualDocument(uri, stat.size, await main.NormalFile.open(uri));
 
 			} else if (uri.scheme === main.DebugMemoryFileSystem.SCHEME) {
-				const stat = await vscode.workspace.fs.stat(uri);
 				this.watch(uri);
 				return new HexVirtualDocument(uri, stat.size, main.DebugMemoryFileSystem.me.open(uri));
 
@@ -416,6 +419,7 @@ export class HexEditorProvider implements vscode.CustomReadonlyEditorProvider {
 				if (uri2.scheme === 'file')
 					return new HexVirtualDocument(uri, offset.toOffset - offset.fromOffset, main.withOffset(await main.NormalFile.open(uri2), offset));
 			}
+				*/
 			return new HexDocument(uri, await vscode.workspace.fs.readFile(uri));
 
 		} catch (error) {

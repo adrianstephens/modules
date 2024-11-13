@@ -164,18 +164,18 @@ cols.forEach((header,i) => {
 
 table.querySelectorAll('tbody tr').forEach(row => row.addEventListener('click', event =>
 	vscode.postMessage({
-		command: event.target.matches('tr') ? 'click' : 'select',
+		command: event.target.matches('tr') ? 'click' : event.target.parentNode.matches('.path') ? 'path' : 'select',
 		id: row.id
 	})
 ));
-
+/*
 table.querySelectorAll('td.path').forEach(path => path.addEventListener('click', event =>
 	vscode.postMessage({
 		command: 'open',
 		path: path.getAttribute("title")
 	})
 ));
-
+*/
 
 window.addEventListener('message', event => {
 	switch (event.data.command) {

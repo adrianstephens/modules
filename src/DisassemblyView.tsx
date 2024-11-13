@@ -23,6 +23,21 @@ export class DisassemblyView {
 	addresses: number[] = [];//address, accumulated labels
 	labels: number[] = [];
 	
+	static async canDisassemble(session: vscode.DebugSession, address: number) {
+		try {
+			const res : DisassembleResponse = await session.customRequest("disassemble", {
+				memoryReference:	'0x' + address.toString(16),
+				instructionOffset:	0,
+				instructionCount:	1,
+				resolveSymbols:		false
+			});
+			return !!res;
+		} catch (e) {
+			console.log("Can't disassemble:", e)
+			return false;
+		}
+	}
+
 	constructor(private context: vscode.ExtensionContext, private session: vscode.DebugSession, private address:number, length:number, title: string, column: vscode.ViewColumn) {
 		const panel = vscode.window.createWebviewPanel("modules.disassembly", title, column, { enableScripts: true });
 
@@ -59,7 +74,7 @@ export class DisassemblyView {
 							memoryReference,
 							instructionOffset,
 							instructionCount:	message.count,
-							resolveSymbols:		true,
+							resolveSymbols:		false,
 						}).then((res: DisassembleResponse) => {
 							panel.webview.postMessage({command:'instructions', offset: message.offset, instructions: res?.instructions});
 						}, reason =>
@@ -80,7 +95,7 @@ export class DisassemblyView {
 	}
 
 	getAddress(offset: number) {
-		console.log(`get address: ${offset.toString(16)}`);
+		//console.log(`get address: ${offset.toString(16)}`);
 		const label 	= utils.lowerBound(this.labels, offset, (a, b, i) => a < b - i);
 		const instr		= offset - label;
 		const index		= Math.floor(instr / 256);
