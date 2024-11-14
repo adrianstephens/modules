@@ -1,3 +1,4 @@
 [submodule "src/shared"]
 	path = src/shared
 	url = https://github.com/adrianstephens/ts-shared.git
+	branch = main
