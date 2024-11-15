@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as utils from './shared/utils';
 import {DebugProtocol} from '@vscode/debugprotocol';
 import {ModuleWebViewProvider} from "./ModulesView";
-import {DllEditorProvider, DyLibEditorProvider} from "./DLLView";
+import {DllEditorProvider, DyLibEditorProvider, ELFEditorProvider} from "./DLLView";
 import {HexEditorProvider} from "./HexView";
 import * as telemetry from "./telemetry";
 import "./shared/clr";
@@ -548,6 +548,7 @@ export function activate(context: vscode.ExtensionContext) {
 	new ModuleWebViewProvider(context);
 	new DllEditorProvider(context);
 	new DyLibEditorProvider(context);
+	new ELFEditorProvider(context);
 	
 	new ReadOnlyFilesystem(context);
 	new SubfileFileSystem(context);

@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as utils from "./shared/utils";
 import {DebugProtocol} from '@vscode/debugprotocol';
-import {jsx, fragment, codicons, id_selector} from "./shared/jsx";
+import {jsx, fragment, render, codicons, id_selector} from "./shared/jsx";
 import * as telemetry from "./telemetry";
 import * as main from "./extension";
 
@@ -310,7 +310,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 
 		const cols		= Object.keys(column_descriptors).filter(k => has_col.has(k));
 
-		return '<!DOCTYPE html>' +
+		return '<!DOCTYPE html>' + render(
 			<html lang="en">
 				<head>
 					<meta charset="UTF-8"/>
@@ -337,6 +337,6 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 				</table>
 				<script src={this.getUri("shared.js")}></script>
 				<script src={this.getUri("modules.js")}></script>
-			</body></html>;
+			</body></html>);
 	}
 }

@@ -1,7 +1,7 @@
 /* eslint-disable no-empty */
 import * as vscode from "vscode";
 import { DebugProtocol } from "@vscode/debugprotocol";
-import { jsx, fragment, codicons, id_selector } from "./shared/jsx";
+import { jsx, fragment, render, codicons, id_selector } from "./shared/jsx";
 import * as utils from "./shared/utils";
 import * as main from "./extension";
 
@@ -46,7 +46,7 @@ export class DisassemblyView {
 				panel.dispose();
 		});
 
-		panel.webview.html = "<!DOCTYPE html>" + <html lang="en">
+		panel.webview.html = "<!DOCTYPE html>" + render(<html lang="en">
 			<head>
 				<meta charset="utf-8" />
 				<meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no" />
@@ -59,7 +59,7 @@ export class DisassemblyView {
 				<script src={ main.webviewUri(context, panel.webview, "shared.js")}></script>
 				<script src={ main.webviewUri(context, panel.webview, "disassembly.js")}></script>
 			</body>
-		</html>;
+		</html>);
 
 		this.countInstructions(address, length, (total:number) => {
 			panel.webview.postMessage({command:'total', total});

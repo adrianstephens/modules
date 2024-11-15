@@ -49,6 +49,15 @@
 				]
 			},
 			{
+				"viewType": "modules.elfView",
+				"displayName": "ELF Viewer",
+				"priority": "option",
+				"selector": [
+					{"filenamePattern": "*.elf"},
+					{"filenamePattern": "*"}
+				]
+			},
+			{
 				"viewType": "hex.view",
 				"displayName": "Hex Viewer",
 				"selector": [

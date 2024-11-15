@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import {jsx, fragment, codicons, Icon} from "./shared/jsx";
+import {jsx, fragment, render, codicons, Icon} from "./shared/jsx";
 import * as main from "./extension";
 
 const radices = [
@@ -59,15 +59,14 @@ class HexEditor {
 			enableScripts: true,
 		};
 
-		webview.html = '<!DOCTYPE html>' +
-			<html lang="en">
-				<head>
-					<meta charset="UTF-8"/>
-					<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-					<link rel="stylesheet" type="text/css" href={main.webviewUri(context, webview, 'shared.css')}/>
-					<link rel="stylesheet" type="text/css" href={main.webviewUri(context, webview, 'hexview.css')}/>
-				</head>
-				<body  data-vscode-context='{"preventDefaultContextMenuItems": true}'>
+		webview.html = '<!DOCTYPE html>' + render(<html lang="en">
+			<head>
+				<meta charset="UTF-8"/>
+				<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+				<link rel="stylesheet" type="text/css" href={main.webviewUri(context, webview, 'shared.css')}/>
+				<link rel="stylesheet" type="text/css" href={main.webviewUri(context, webview, 'hexview.css')}/>
+			</head>
+			<body  data-vscode-context='{"preventDefaultContextMenuItems": true}'>
 				<div class='container'>
 					<div class='hexview'>
 						<div class='addr'/>
@@ -77,7 +76,8 @@ class HexEditor {
 				</div>
 				<script src={main.webviewUri(context, webview, 'shared.js')}></script>
 				<script src={main.webviewUri(context, webview, 'hexview.js')}></script>
-			</body></html>;
+			</body>
+		</html>);
 
 		const receive = webview.onDidReceiveMessage(async message => {
 			console.log(message);
