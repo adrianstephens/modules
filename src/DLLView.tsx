@@ -50,6 +50,8 @@ function Icon2(props: {icon: IconType}) {
 	);
 }
 
+const memory_refs: Record<number, Uint8Array> = {};
+
 function TreeParent(props: {name: string, icon?: IconType, open?: boolean, path?: boolean, children?: any}) {
 	return <div class={'caret' + (props.open ? ' caret-down' : '') + (props.path ? ' path' : '')}>
 		<span>
@@ -73,7 +75,30 @@ function MemoryFlags(flags: number) {
 	return Flag(flags, utils.MEM.WRITE, 'w') + Flag(flags, utils.MEM.EXECUTE, 'x') + Flag(flags, utils.MEM.READ, 'r');
 }
 
-function TreeItem(props: {name: string, value: any}) {
+function Data(props: {name?: string, data: Uint8Array}) {
+	const {name, data} = props;
+	return <div class='binary' data-offset={data.byteOffset} data-length={data.length}>
+		<Icon2 icon={icon_binary}/>
+		{`${name && (name + ': ')}0x${data.byteOffset.toString(16)}[${data.length}]`}
+	</div>;
+}
+
+function Memory(props: {name?: string, mm: utils.MappedMemory}) {
+	const {name, mm} = props;
+	memory_refs[mm.data.byteOffset] = mm.data;
+	return <div class='binary' data-offset={mm.data.byteOffset} data-length={mm.data.byteLength} data-address={mm.address} data-exec={!!(mm.flags & utils.MEM.EXECUTE)}>
+		<Icon2 icon={icon_binary}/>
+		{`${name && (name + ': ')}0x${mm.address.toString(16)}[0x${mm.data!.byteLength.toString(16)}] ${MemoryFlags(mm.flags)}`}
+	</div>;
+}
+
+function TreeParentMaybe(props: {name?: string, icon?: IconType, open?: boolean, path?: boolean, children?: any}) {
+	return props.name
+		? TreeParent({...props, name: props.name!})
+		: props.children;
+}
+
+function TreeItem(props: {name?: string, value: any}) {
 	const {name, value} = props;
 	switch (typeof value) {
 		case 'undefined':
@@ -81,37 +106,38 @@ function TreeItem(props: {name: string, value: any}) {
 
 		case 'object':
 			if (value instanceof utils.MappedMemory) {
-				return <div class='binary' data-offset={value.data.byteOffset} data-length={value.data.byteLength} data-va={value.address} data-exec={!!(value.flags & utils.MEM.EXECUTE)}>
-					<Icon2 icon={icon_binary}/>
-					{`${name}: 0x${value.address.toString(16)}[0x${value.data!.byteLength.toString(16)}] ${MemoryFlags(value.flags)}`}
-				</div>;
+				return <Memory name={name} mm={value}/>
 			} else if (value instanceof Uint8Array) {
-				return <div class='binary' data-offset={value.byteOffset} data-length={value.length}>
-					<Icon2 icon={icon_binary}/>
-					{`${name}: 0x${value.byteOffset.toString(16)}[${value.length}]`}
-				</div>;
+				return <Data name={name} data={value}/>
 			} else if (!(0 in value) && hasCustomToString(value)) {
 				return <div>
 					<Icon2 icon={icon_item}/>
 					{`${name}: ${value}`}
 				</div>;
+			} else if (Array.isArray(value[0]) && value[0].length === 2 && typeof(value[0][0] === 'string')) {
+				return <TreeParentMaybe name={name} icon={section}>
+					{value.map(([name, value]: [string, any]) => <TreeItem name={name} value={value}/> )}
+				</TreeParentMaybe>
 			} else {
-				return <TreeParent name={props.name} path={value instanceof pe.DLLImports}>
-					{Object.entries(value).map(([name, value]) => <TreeItem name={name} value={value}/> )}
-				</TreeParent>
+				return <TreeParentMaybe name={name} icon={section} open={true}>
+					{Object.entries(value).map(([name, value]) => <TreeItem name={name} value={value}/>)}
+				</TreeParentMaybe>
 			}
-		//case 'number':
-		//case 'bigint':
-		//	return <div><Icon2 icon={icon_number}/>{`${name}: ${value}`}</div>;
 
 		default:
-			//console.log(name, value);
 			return <div><Icon2 icon={icon_item}/> {`${name}: ${value}`}</div>;
 	}
 }
+/*
+function TreeChildren(children: Record<string,any> | [string,any][]) {
+	return Array.isArray(children) &&Array.isArray(children[0]) && children[0].length === 2 && typeof(children[0][0] === 'string')
+		? children.map(([name, value]: [string, any]) => <TreeItem name={name} value={value}/>)
+		: Object.entries(children).map(([name, value]) => <TreeItem name={name} value={value}/>);
+}
+*/
 
-function TreeChildren(children: Record<string,any>) {
-	return Object.entries(children).map(([name, value]) => <TreeItem name={name} value={value}/>);
+function TreeChildren(value: any) {
+	return <TreeItem value={value}/>
 }
 
 async function findModule(name: string) {
@@ -129,28 +155,41 @@ async function findModule(name: string) {
 async function OnMessage(context: vscode.ExtensionContext, uri: vscode.Uri, message: any) {
 	switch (message.command) {
 		case 'binary': {
+			const offset	= +message.offset;
 			const length	= +message.length;
+			const address	= +message.address;//add module address sometimes
+			const session	= vscode.debug.activeDebugSession!;
+
+			// if exec is set, see if we can disassemble it
+			if ('exec' in message) {
+				const module	= await findModule(path.parse(uri.path).name);
+				if (module) {
+					if (await DisassemblyView.canDisassemble(session, address)) {
+						new DisassemblyView(context, session, address, length, `Disassembly @ 0x${address.toString(16)}`, vscode.ViewColumn.Beside);
+						return;
+					}
+				}
+			}
+
+			// if it's in memory_refs, use it
+			const ref = memory_refs[offset];
+			if (ref) {
+				vscode.commands.executeCommand('hex.open', ref, message.name ?? "binary", vscode.ViewColumn.Beside);
+				return;
+			}
+
+			// otherwise see if it's in debug memory
 			const module	= await findModule(path.parse(uri.path).name);
 			if (module) {
 				const session = vscode.debug.activeDebugSession!;
-				const address = +(module.addressRange ?? 0) + +message.offset;
-				if ('exec' in message && await DisassemblyView.canDisassemble(session, address)) {
-					new DisassemblyView(context, session, address, length, `Disassembly @ 0x${address.toString(16)}`, vscode.ViewColumn.Beside);
-				} else {
-					const uri = main.DebugMemoryFileSystem.makeUri(session, `0x${address.toString(16)}`, {fromOffset: 0, toOffset: length});
-					vscode.commands.executeCommand('vscode.openWith', uri, 'hex.view', {preview: true, viewColumn: vscode.ViewColumn.Beside});
-				}
+				const uri = main.DebugMemoryFileSystem.makeUri(session, `0x${address.toString(16)}`, {fromOffset: 0, toOffset: length});
+				vscode.commands.executeCommand('vscode.openWith', uri, 'hex.view', {preview: true, viewColumn: vscode.ViewColumn.Beside});
 				return;
 			}
 	
-			const offset	= +message.offset;
-			const file		= main.withOffset(await main.NormalFile.open(uri), {fromOffset: offset, toOffset: offset + length});
+			// otherwise load and use it from disk (or whatever)
+			const file		= main.withOffset(await main.openFile(uri), {fromOffset: offset, toOffset: offset + length});
 			vscode.commands.executeCommand('hex.open', file, message.name ?? "binary", vscode.ViewColumn.Beside);
-			
-			//const uri = dll.uri.with({query: `baseAddress=${offset}`})
-			//vscode.commands.executeCommand('vscode.openWith', uri, 'hexEditor.hexedit', {preview: true, viewColumn: vscode.ViewColumn.Beside});
-			//const uri = main.SubfileFileSystem.makeUri(dll.uri, offset, length);
-			//vscode.commands.executeCommand('vscode.openWith', uri, 'hex.view', {preview: true, viewColumn: vscode.ViewColumn.Beside});
 			break;
 		}
 		case 'path': {
@@ -269,6 +308,7 @@ function machFile(file: mach.MachFile) {
 
 		<TreeParent name="Commands" icon={folder} open={true}>
 		{file.commands.map(c =>
+			//<TreeItem name={mach.CMD[c.cmd]} value={c.data}></TreeItem>
 			<TreeParent name={mach.CMD[c.cmd]} icon={section}>
 				{TreeChildren(c.data)}
 			</TreeParent>

@@ -88,38 +88,37 @@ class ScrollBar {
 		this.horizontal = horizontal;
 		this.update();
 
-		thumb.addEventListener('mousedown', event => {
-			const mouseOffset 	= horizontal ? thumb.offsetLeft - event.clientX : thumb.offsetTop - event.clientY;
+		thumb.addEventListener("lostpointercapture", e => {
+			if (thumb.onMouseUp)
+				thumb.onMouseUp(e);
+		});
+
+		thumb.addEventListener('pointerdown', event => {
+			console.log('down');
+			const pointerOffset 	= horizontal ? thumb.offsetLeft - event.clientX : thumb.offsetTop - event.clientY;
 			thumb.classList.add('active');
 
-			const onMouseMove = event => {
-				this.setThumbPixel(mouseOffset + (horizontal ? event.clientX : event.clientY));
+			const onPointerMove = event => {
+				this.setThumbPixel(pointerOffset + (horizontal ? event.clientX : event.clientY));
 			};
 	
-			const onMouseUp = () => {
+			const onPointerUp = () => {
+				console.log('up');
 				thumb.classList.remove('active');
-				document.removeEventListener('mousemove',	onMouseMove);
-				document.removeEventListener('mouseup',		onMouseUp);
+				window.removeEventListener('pointermove',	onPointerMove);
+				window.removeEventListener('pointerup',		onPointerUp);
 			};
 
-			document.addEventListener('mousemove',	onMouseMove);
-			document.addEventListener('mouseup', 	onMouseUp);
+			if (thumb.setPointerCapture)
+				thumb.setPointerCapture(event.pointerId);
+
+			window.addEventListener('pointermove',	onPointerMove);
+			window.addEventListener('pointerup', 	onPointerUp);
 		});
 	}
 
-		/*
-	get sizes() {
-		return [this.container.clientSize, this.container.scrollSize, this.container.clientOffset];
-		const client = this.container.getBoundingClientRect();
-		return this.horizontal
-			? [this.container.clientWidth, this.container.scrollWidth, Math.max(client.left,0)]
-			: [this.container.clientHeight, this.container.scrollHeight, Math.max(client.top, 0)];
-	}
-		*/
-
 	update() {
 		this.setThumb(this.container.scrollOffset);
-		//this.setThumb(this.horizontal ? this.container.scrollLeft : this.container.scrollTop);
 	}
 
 	setScroll(scroll) {
@@ -173,10 +172,8 @@ class ScrollBar {
 		this.container.setScroll(scroll);
 		if (this.horizontal) {
 			this.thumb.style.left		= `${thumbPos}px`;
-			//this.container.scrollLeft	= scroll;
 		} else {
 			this.thumb.style.top 		= `${thumbPos}px`;
-			//this.container.scrollTop	= scroll;
 		}
 	}
 }

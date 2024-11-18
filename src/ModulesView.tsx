@@ -320,23 +320,24 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 					<title>Modules</title>
 				</head>
 				<body>
-				<table>
-					<thead>
-						<tr>
-							{cols.map(i => 
-								<th data-type={column_descriptors[i].type}>{column_descriptors[i].label}</th>
-							).join('')}
-						</tr>
-					</thead>
+					<table>
+						<thead>
+							<tr>
+								{cols.map(i => 
+									<th data-type={column_descriptors[i].type}>{column_descriptors[i].label}</th>
+								)}
+							</tr>
+						</thead>
 
-					<tbody>
-						{Object.entries(this.modules).map(([id, m]) =>
-							<tr id={id}>{cols.map(i => column_descriptors[i].html ? column_descriptors[i].html(m) : <td>{m[i]}</td>)}</tr>
-						)}
-					</tbody>
-				</table>
-				<script src={this.getUri("shared.js")}></script>
-				<script src={this.getUri("modules.js")}></script>
-			</body></html>);
+						<tbody>
+							{Object.entries(this.modules).map(([id, m]) =>
+								<tr id={id}>{cols.map(i => column_descriptors[i].html ? column_descriptors[i].html(m) : <td>{m[i]}</td>)}</tr>
+							)}
+						</tbody>
+					</table>
+					<script src={this.getUri("shared.js")}></script>
+					<script src={this.getUri("modules.js")}></script>
+				</body>
+			</html>);
 	}
 }

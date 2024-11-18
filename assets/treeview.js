@@ -22,6 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 document.querySelectorAll('.caret').forEach(caret => {
 	caret.addEventListener('click', event => {
+		if (event.target.parentElement !== caret || window.getSelection().toString().length > 0)
+			return;
+
 		caret.classList.toggle('caret-down');
 		if (caret.classList.contains('caret-down')) {
 			state.open.push(generateUniqueId(caret));

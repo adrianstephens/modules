@@ -265,6 +265,9 @@ export class HexEditorProvider implements vscode.CustomReadonlyEditorProvider {
 	
 			if (p0 instanceof vscode.Uri)
 				return vscode.commands.executeCommand('vscode.openWith', p0, 'hex.view', {preview: true});
+
+			if (p0 instanceof Uint8Array)
+				p0 = new HexDocument(vscode.Uri.file('binary'), p0);
 	
 			if (isStreamingData(p0)) {
 				let title	= `binary`;
