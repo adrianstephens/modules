@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as utils from "./shared/utils";
 import {DebugProtocol} from '@vscode/debugprotocol';
-import {jsx, fragment, render, codicons, id_selector} from "./shared/jsx";
+import {jsx, fragment, render, codicons, id_selector, Nonce, CSP} from "./shared/jsx";
 import * as telemetry from "./telemetry";
 import * as main from "./extension";
 
@@ -68,24 +68,17 @@ function getModuleAddress(session: vscode.DebugSession, frameId: number, m: Modu
 }
 
 
-async function getModuleAddressFunction(session: vscode.DebugSession, frameId: number) : Promise<string> {
-	let resp = await session.customRequest('evaluate', { 
-		expression: 'GetModuleHandleA',
-		frameId,
-		context: 	'repl'
-	});
+async function getFunction(session: vscode.DebugSession, frameId: number, name: string) : Promise<string|undefined> {
+	const resp = await session.customRequest('evaluate', {expression: name, frameId, context: 'repl'});
 	if (resp.memoryReference)
 		return resp.memoryReference;
-	
-	resp = await session.customRequest('evaluate', { 
-		expression: 'kernel32!GetModuleHandleA',
-		frameId,
-		context: 	'repl'
-	});
-	if (resp.memoryReference)
-		return resp.memoryReference;
+}
 
-	return '';
+async function getModuleAddressFunction(session: vscode.DebugSession, frameId: number) : Promise<string> {
+	return await getFunction(session, frameId, 'GetModuleHandleA')
+		?? await getFunction(session, frameId, 'kernel32!GetModuleHandleA')
+		?? await getFunction(session, frameId, 'kernelBase!GetModuleHandleA')
+		?? '';
 }
 
 export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
@@ -276,12 +269,11 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 			if (type)
 				telemetry.send('view.none', {type});
 
-			return `<!DOCTYPE html>`+
-			<html lang="en">
+			return '<!DOCTYPE html>'+ render(<html lang="en">
 				<body>
 					No Modules
 				</body>
-			</html>;
+			</html>);
 		}
 
 		const has_col	= modules.reduce((cols, m) => (Object.keys(m).forEach(k => cols.add(k)), cols), new Set<string>());
@@ -309,35 +301,36 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 			has_col.add('addressRange');
 
 		const cols		= Object.keys(column_descriptors).filter(k => has_col.has(k));
+		const nonce		= Nonce();
 
-		return '<!DOCTYPE html>' + render(
-			<html lang="en">
-				<head>
-					<meta charset="UTF-8"/>
-					<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-					<link rel="stylesheet" type="text/css" href={this.getUri('shared.css')}/>
-					<link rel="stylesheet" type="text/css" href={this.getUri('modules.css')}/>
-					<title>Modules</title>
-				</head>
-				<body>
-					<table>
-						<thead>
-							<tr>
-								{cols.map(i => 
-									<th data-type={column_descriptors[i].type}>{column_descriptors[i].label}</th>
-								)}
-							</tr>
-						</thead>
-
-						<tbody>
-							{Object.entries(this.modules).map(([id, m]) =>
-								<tr id={id}>{cols.map(i => column_descriptors[i].html ? column_descriptors[i].html(m) : <td>{m[i]}</td>)}</tr>
+		return '<!DOCTYPE html>' + render(<html lang="en">
+			<head>
+				<meta charset="UTF-8"/>
+				<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+				<link rel="stylesheet" type="text/css" href={this.getUri('shared.css')}/>
+				<link rel="stylesheet" type="text/css" href={this.getUri('modules.css')}/>
+				<CSP csp={this.view!.webview.cspSource} nonce={nonce}/>
+				<title>Modules</title>
+			</head>
+			<body>
+				<table>
+					<thead>
+						<tr>
+							{cols.map(i => 
+								<th data-type={column_descriptors[i].type}>{column_descriptors[i].label}</th>
 							)}
-						</tbody>
-					</table>
-					<script src={this.getUri("shared.js")}></script>
-					<script src={this.getUri("modules.js")}></script>
-				</body>
-			</html>);
+						</tr>
+					</thead>
+
+					<tbody>
+						{Object.entries(this.modules).map(([id, m]) =>
+							<tr id={id}>{cols.map(i => column_descriptors[i].html ? column_descriptors[i].html(m) : <td>{m[i]}</td>)}</tr>
+						)}
+					</tbody>
+				</table>
+				<script nonce={nonce} src={this.getUri("shared.js")}></script>
+				<script nonce={nonce} src={this.getUri("modules.js")}></script>
+			</body>
+		</html>);
 	}
 }

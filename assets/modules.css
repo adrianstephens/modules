@@ -85,6 +85,7 @@ td.path {
 	position: relative;
 	padding-right: 0;
 	text-overflow:initial;
+	cursor: pointer;
 
 	&:hover {
         & > span {

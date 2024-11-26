@@ -38,22 +38,16 @@
 				"displayName": "DLL Viewer",
 				"selector": [
 					{"filenamePattern": "*.dll"},
-					{"filenamePattern": "*.exe"}
+					{"filenamePattern": "*.exe"},
+					{"filenamePattern": "*.dylib"},
+					{"filenamePattern": "*.elf"}
 				]
 			},
 			{
-				"viewType": "modules.dylibView",
-				"displayName": "Dylib Viewer",
-				"selector": [
-					{"filenamePattern": "*.dylib"}
-				]
-			},
-			{
-				"viewType": "modules.elfView",
+				"viewType": "modules.dllView",
 				"displayName": "ELF Viewer",
 				"priority": "option",
 				"selector": [
-					{"filenamePattern": "*.elf"},
 					{"filenamePattern": "*"}
 				]
 			},
