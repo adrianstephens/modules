@@ -15,11 +15,10 @@
 		"sourceMap": true,
 		"strict": true,
 		"rootDir": "src",
-		"jsx": "react",
-		"jsxFactory": "jsx",
-		"jsxFragmentFactory": "fragment",
+		"jsx": "react-jsx",
+		"jsxImportSource": "./shared",
 		"forceConsistentCasingInFileNames": true
 	},
-	"include": ["src", "hidden/VariablesView.tsx"],
+	"include": ["src/extension.ts", "src/globals.d.ts"],
 	"exclude": ["node_modules", ".vscode-test", "hidden"]
 }

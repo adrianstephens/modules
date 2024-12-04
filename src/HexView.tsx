@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import {jsx, fragment, render, codicons, Icon} from "./shared/jsx";
+import * as fs from './shared/fs';
+import * as jsx from "./shared/jsx-runtime";
 import * as main from "./extension";
 
 const radices = [
@@ -52,19 +53,19 @@ class HexEditor {
 			this.webviewPanel.webview.postMessage(message);
 		});
 	}
-	constructor(private context: vscode.ExtensionContext, public doc: StreamingData, public webviewPanel: vscode.WebviewPanel) {
+	constructor(context: vscode.ExtensionContext, public doc: StreamingData, public webviewPanel: vscode.WebviewPanel) {
 		const webview = webviewPanel.webview;
 
 		webview.options = {
 			enableScripts: true,
 		};
 
-		webview.html = '<!DOCTYPE html>' + render(<html lang="en">
+		webview.html = '<!DOCTYPE html>' + jsx.render(<html lang="en">
 			<head>
 				<meta charset="UTF-8"/>
 				<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-				<link rel="stylesheet" type="text/css" href={main.webviewUri(context, webview, 'shared.css')}/>
-				<link rel="stylesheet" type="text/css" href={main.webviewUri(context, webview, 'hexview.css')}/>
+				<link rel="stylesheet" type="text/css" href={main.webviewUri(webview, 'shared.css')}/>
+				<link rel="stylesheet" type="text/css" href={main.webviewUri(webview, 'hexview.css')}/>
 			</head>
 			<body  data-vscode-context='{"preventDefaultContextMenuItems": true}'>
 				<div class='container'>
@@ -74,12 +75,12 @@ class HexEditor {
 						<div class='text' data-vscode-context='{"section": "text"}'/>
 					</div>
 				</div>
-				<script src={main.webviewUri(context, webview, 'shared.js')}></script>
-				<script src={main.webviewUri(context, webview, 'hexview.js')}></script>
+				<script src={main.webviewUri(webview, 'shared.js')}></script>
+				<script src={main.webviewUri(webview, 'hexview.js')}></script>
 			</body>
 		</html>);
 
-		const receive = webview.onDidReceiveMessage(async message => {
+		webview.onDidReceiveMessage(async message => {
 			console.log(message);
 			switch (message.command) {
 				case 'ready': {
@@ -113,10 +114,6 @@ class HexEditor {
 				}
 			}
 		});
-
-		webviewPanel.onDidDispose(() => 
-			receive.dispose()
-		);
 	}
 	setTop(top: number) {
 		this.webviewPanel.webview.postMessage({command: 'top', top});
@@ -203,7 +200,7 @@ class HexDocument implements vscode.CustomDocument, StreamingData {
 }
 
 class HexVirtualDocument implements vscode.CustomDocument, StreamingData {
-	constructor(readonly uri: vscode.Uri, public length: number, private file: main.File) {}
+	constructor(readonly uri: vscode.Uri, public length: number, private file: fs.File) {}
 	dispose() {
 		this.file.dispose();
 	}
@@ -377,7 +374,7 @@ export class HexEditorProvider implements vscode.CustomReadonlyEditorProvider {
 		context.subscriptions.push(vscode.commands.registerCommand('hex.reopen', () => {
 			const activeTabInput = vscode.window.tabGroups.activeTabGroup.activeTab?.input as {
 				[key: string]: any;
-				uri: vscode.Uri | undefined;
+				uri: vscode.Uri | undefined;        
 			};
 			if (activeTabInput.uri) {
 				vscode.commands.executeCommand("vscode.openWith", activeTabInput.uri, "hex.view");
@@ -394,8 +391,8 @@ export class HexEditorProvider implements vscode.CustomReadonlyEditorProvider {
 			for (const group of vscode.window.tabGroups.all) {
 				for (const editor of group.tabs) {
 					if (editor.input instanceof vscode.TabInputCustom)
-					if (editor.input.viewType == 'hex.view' && editor.input.uri.toString() === uri.toString())
-						vscode.window.tabGroups.close(editor, true);
+						if (editor.input.viewType == 'hex.view' && editor.input.uri.toString() === uri.toString())
+							vscode.window.tabGroups.close(editor, true);
 				}
 			}
 			watcher.dispose();
@@ -405,24 +402,10 @@ export class HexEditorProvider implements vscode.CustomReadonlyEditorProvider {
 	async openCustomDocument(uri: vscode.Uri, openContext: vscode.CustomDocumentOpenContext, token: vscode.CancellationToken): Promise<vscode.CustomDocument> {
 		try {
 			const stat = await vscode.workspace.fs.stat(uri);
-			const file = await main.openFile(uri);
+			const file = await fs.openFile(uri);
 			if (file)
 				return new HexVirtualDocument(uri, stat.size, file);
-/*
-			if (uri.scheme === 'file') {
-				if (stat.size > 0x10000)
-					return new HexVirtualDocument(uri, stat.size, await main.NormalFile.open(uri));
 
-			} else if (uri.scheme === main.DebugMemoryFileSystem.SCHEME) {
-				this.watch(uri);
-				return new HexVirtualDocument(uri, stat.size, main.DebugMemoryFileSystem.me.open(uri));
-
-			} else if (uri.scheme === main.SubfileFileSystem.SCHEME) {
-				const { uri: uri2, offset } = main.SubfileFileSystem.parseUri(uri);
-				if (uri2.scheme === 'file')
-					return new HexVirtualDocument(uri, offset.toOffset - offset.fromOffset, main.withOffset(await main.NormalFile.open(uri2), offset));
-			}
-				*/
 			return new HexDocument(uri, await vscode.workspace.fs.readFile(uri));
 
 		} catch (error) {

@@ -14,7 +14,7 @@
 	"icon": "assets/icon.png",
 	"version": "0.1.0",
 	"publisher": "isopodlabs",
-	"repository": "https://github.com/adrianstephens/modules",
+	"repository": "https://github.com/adrianstephens/vscode-modules",
 	"files": [
 		"out/**/*.js",
 		"assets/*",
@@ -184,15 +184,6 @@
 			]
 		}
 	},
-
-	"scripts_webpack": {
-		"vscode:prepublish": "npm run package",
-		"compile": "webpack",
-		"watch": "webpack --watch",
-		"package": "webpack --mode production --devtool hidden-source-map",
-		"test-compile": "tsc -p ./",
-		"publish": "vsce publish patch"
-	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
 		"compile": "tsc -p ./",
@@ -211,8 +202,5 @@
 		"ts-loader": "^9.5.1",
 		"webpack": "^5.95.0",
 		"webpack-cli": "^5.1.4"
-	},
-	"dependencies": {
-		"@vscode/extension-telemetry": "^0.9.7"
 	}
 }

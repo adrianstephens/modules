@@ -3,8 +3,8 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as utils from "./shared/utils";
 import {DebugProtocol} from '@vscode/debugprotocol';
-import {jsx, fragment, render, codicons, id_selector, Nonce, CSP} from "./shared/jsx";
-import * as telemetry from "./telemetry";
+import {CSP, Nonce, render,id_selector} from "./shared/jsx-runtime";
+//import * as telemetry from "./telemetry";
 import * as main from "./extension";
 
 //-----------------------------------------------------------------------------
@@ -53,7 +53,6 @@ const column_descriptors: Record<string, ColumnDescriptor> = {
 	symbolFilePath:	{label: 'Symbols',							html: m => <td>{m.symbolFilePath ?? m.symbolStatus}</td>},
 	dateTimeStamp: 	{label: 'Time Stamp',	type: 'time'},
 	vsTimestampUTC: {label: 'Time Stamp',	type: 'time',		html: m => <td>{new Date(m.vsTimestampUTC * 1000).toUTCString()}</td>},
-	//	vsPreferredLoadAddress: "4324950016",
 };
 
 function getModuleAddress(session: vscode.DebugSession, frameId: number, m: Module, func: string) {
@@ -97,7 +96,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 	nextOrder			= 0;
 	selected_id?: string;
 
-	constructor(private context: vscode.ExtensionContext) {
+	constructor(context: vscode.ExtensionContext) {
 		context.subscriptions.push(vscode.Disposable.from(
 			vscode.window.registerWebviewViewProvider('modules-view', this),
 			vscode.commands.registerCommand('modules.getModules', () => Object.values(this.modules))
@@ -148,7 +147,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 
 		webviewView.webview.options = {
 			enableScripts: true,
-			localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'assets')]
+			localResourceRoots: [vscode.Uri.joinPath(main.extension_context.extensionUri, 'assets')]
 		};
 
 		webviewView.webview.onDidReceiveMessage(async message => {
@@ -182,16 +181,16 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 				case 'path': {
 					const m = this.modules[message.id];
 					if (m.path && await vscode.workspace.fs.stat(vscode.Uri.file(m.path)).then(()=>true, ()=>false)) {
-						vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(m.path), 'modules.dylibView', {preview: true});
+						vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(m.path), 'modules.dllView', {preview: true});
 					} else if (this.session && m.addressRange) {
 						const uri = main.DebugMemoryFileSystem.makeUri(this.session, m.addressRange, {fromOffset:0, toOffset:m.vsModuleSize}, m.name);
-						vscode.commands.executeCommand('vscode.openWith', uri, 'modules.dylibView', {preview: true});
+						vscode.commands.executeCommand('vscode.openWith', uri, 'modules.dllView', {preview: true});
 					}
 					break;
 				}
 				case 'open': {
 					if (await vscode.workspace.fs.stat(vscode.Uri.file(message.path)).then(()=>true, ()=>false)) {
-						vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.path));
+						vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.path), {preview: true});
 					}
 					break;
 				}
@@ -259,15 +258,15 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	getUri(name: string) {
-		return main.webviewUri(this.context, this.view!.webview, name);
+		return main.webviewUri(this.view!.webview, name);
 	}
 
 	updateView() : string {
 		const	modules = Object.values(this.modules);
 		if (modules.length == 0) {
 			const type = this.session?.type;
-			if (type)
-				telemetry.send('view.none', {type});
+			//if (type)
+			//	telemetry.send('view.none', {type});
 
 			return '<!DOCTYPE html>'+ render(<html lang="en">
 				<body>
@@ -278,7 +277,8 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 
 		const has_col	= modules.reduce((cols, m) => (Object.keys(m).forEach(k => cols.add(k)), cols), new Set<string>());
 
-		this.tele.combine(1000, () => telemetry.send('view.update', {type: this.session?.type || 'unknown', cols: Array.from(has_col.keys()).join(', '), rows: modules.length}));
+//		this.tele.combine(1000, () => telemetry.send('view.update', {type: this.session?.type || 'unknown', cols: Array.from(has_col.keys()).join(', '), rows: modules.length}));
+
 /*
 		if (has_col.has('path')) {
 			Object.values(modules).forEach(m => {

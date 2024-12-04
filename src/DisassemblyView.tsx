@@ -1,7 +1,7 @@
 /* eslint-disable no-empty */
 import * as vscode from "vscode";
 import { DebugProtocol } from "@vscode/debugprotocol";
-import { jsx, fragment, render, codicons, id_selector } from "./shared/jsx";
+import { render } from "./shared/jsx-runtime";
 import * as utils from "./shared/utils";
 import * as main from "./extension";
 
@@ -50,14 +50,14 @@ export class DisassemblyView {
 			<head>
 				<meta charset="utf-8" />
 				<meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no" />
-				<link rel="stylesheet" type="text/css" href={main.webviewUri(context, panel.webview, "shared.css")} />
-				<link rel="stylesheet" type="text/css" href={main.webviewUri(context, panel.webview, "disassembly.css")} />
+				<link rel="stylesheet" type="text/css" href={main.webviewUri(panel.webview, "shared.css")} />
+				<link rel="stylesheet" type="text/css" href={main.webviewUri(panel.webview, "disassembly.css")} />
 			</head>
 
 			<body>
 				<div id="root"/>
-				<script src={ main.webviewUri(context, panel.webview, "shared.js")}></script>
-				<script src={ main.webviewUri(context, panel.webview, "disassembly.js")}></script>
+				<script src={ main.webviewUri(panel.webview, "shared.js")}></script>
+				<script src={ main.webviewUri(panel.webview, "disassembly.js")}></script>
 			</body>
 		</html>);
 
@@ -65,21 +65,18 @@ export class DisassemblyView {
 			panel.webview.postMessage({command:'total', total});
 		});
 
-		const recv = panel.webview.onDidReceiveMessage((message: any) => {
+		const recv = panel.webview.onDidReceiveMessage(async (message: any) => {
 			switch (message.command) {
 				case 'request':
 					try {
 						const [memoryReference, instructionOffset] = this.getAddress(message.offset);
-						session.customRequest("disassemble", {
+						const res = await session.customRequest("disassemble", {
 							memoryReference,
 							instructionOffset,
 							instructionCount:	message.count,
 							resolveSymbols:		false,
-						}).then((res: DisassembleResponse) => {
-							panel.webview.postMessage({command:'instructions', offset: message.offset, instructions: res?.instructions});
-						}, reason =>
-							console.log(memoryReference, instructionOffset)
-						);
+						});
+						panel.webview.postMessage({command:'instructions', offset: message.offset, instructions: res?.instructions});
 					} catch (e) {
 						console.log(e);
 					}

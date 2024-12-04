@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		Array.from(elements).forEach(e => e.classList.remove('caret-down'));
 		state.open.forEach(id => document.querySelector(id)?.classList.add('caret-down'));
 	} else {
-		state.open = Array.from(elements, element => generateUniqueId(element));
+		state.open = Array.from(elements, element => generateSelector(element));
 		vscode.setState(state);
 	}
 });
@@ -27,9 +27,9 @@ document.querySelectorAll('.caret').forEach(caret => {
 
 		caret.classList.toggle('caret-down');
 		if (caret.classList.contains('caret-down')) {
-			state.open.push(generateUniqueId(caret));
+			state.open.push(generateSelector(caret));
 		} else {
-			const index = state.open.indexOf(generateUniqueId(caret));
+			const index = state.open.indexOf(generateSelector(caret));
 			if (index !== -1)
 				state.open.splice(index, 1);
 		}
@@ -81,30 +81,66 @@ document.querySelectorAll('.children > div').forEach(item => {
 		event.stopPropagation();
 	});
 });
-*/
+
 document.querySelectorAll('.binary').forEach(item => {
 	item.addEventListener('click', event => {
-		const dataset = event.target?.dataset;
-		if (dataset) {
-			vscode.postMessage({
-				command: 'binary',
-				name: getFirstText(event.target),
-				...dataset
-			})
-			event.stopPropagation();
-		}
+		vscode.postMessage({
+			command: 'binary',
+			name: getFirstText(item),
+			...item.dataset
+		})
+		event.stopPropagation();
 	});
 });
-
-document.querySelectorAll('.path > span').forEach(item => {
+*/
+document.querySelectorAll('.select').forEach(item => {
 	item.addEventListener('click', event => {
-		if (event.offsetX > 20) {
-			vscode.postMessage({
-				command: 'path',
-				path: item.textContent
-			})
-			event.stopPropagation();
-		}
+		vscode.postMessage({
+			command: 'select',
+			selector: generateSelector(item),
+			path: item.textContent,
+			...item.dataset
+		})
+		event.stopPropagation();
 	});
 });
 
+document.querySelectorAll('.dllentry').forEach(item => {
+	item.addEventListener('click', event => {
+		//const test = item.closest('has(.path)');
+		const dll = item.parentNode.parentNode.querySelector('.select').textContent;
+		vscode.postMessage({
+			command: 'dllentry',
+			path: dll,
+			entry: item.textContent
+		});
+		event.stopPropagation();
+	});
+});
+
+window.addEventListener('message', event => {
+	const e = event.data;
+    switch (e.command) {
+		case 'add_class':
+			document.querySelectorAll(event.data.selector).forEach(i => {
+				if (event.data.enable)
+					i.classList.add(event.data.class);
+				else
+					i.classList.remove(event.data.class);
+			});
+			break;
+
+		case 'scroll_to': {
+			const element = document.querySelector(event.data.selector);
+			if (element) {
+				for (let parent = element.parentNode; parent; parent = parent.parentNode) {
+					if (parent.classList?.contains('caret'))
+						parent.classList.add('caret-down');
+				}
+				element.scrollIntoView({behavior: 'smooth', block: 'center'});
+			}
+			break;
+		}
+
+	}
+});

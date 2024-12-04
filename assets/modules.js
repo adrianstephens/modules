@@ -7,6 +7,15 @@ const cols  	= table.querySelectorAll('th');
 const vscroll 	= new ScrollBar(document.body, document.documentElement, false);
 const hscroll 	= new ScrollBar(document.body, document.documentElement, true);
 
+function adjustPathWidths() {
+	console.log('adjustPathWidths');
+	const paths = document.querySelectorAll('td.path');
+	const cellWidth = document.body.clientWidth - (paths[0].offsetLeft + 5);
+	paths.forEach((cell, i) => {
+		cell.style.maxWidth = `${cellWidth}px`;
+	});
+}
+
 window.addEventListener('resize', () => {
 	vscroll.update();
 	hscroll.update();
@@ -15,7 +24,11 @@ window.addEventListener("scroll", () => {
 	vscroll.update();
 });
 
-function initPathWidths() {
+//cols[0].classList.add('sort');
+document.addEventListener('DOMContentLoaded', () => {
+	vscode.postMessage({command: 'ready'});
+
+//	initPathWidths
 	const paths = document.querySelectorAll('td.path');
 	const widths = Array.from(paths, cell => cell.lastElementChild.offsetWidth);
 
@@ -23,7 +36,7 @@ function initPathWidths() {
 		cell.firstElementChild.style.maxWidth = `calc(100% - ${widths[i] + 5}px)`;
 		cell.lastElementChild.style.maxWidth = '100%';
 	});
-}
+});
 
 function replace(text, re, process) {
 	let i = 0;
@@ -112,16 +125,6 @@ function getMarginAndBorder(element) {
 	};
 }
 
-function adjustPathWidths() {
-	const paths = document.querySelectorAll('td.path');
-	const cellWidth = document.body.clientWidth - (paths[0].offsetLeft + 5);
-	paths.forEach((cell, i) => {
-		cell.style.maxWidth = `${cellWidth}px`;
-	});
-}
-
-//cols[0].classList.add('sort');
-initPathWidths();
 
 const resizeObserver = new ResizeObserver(entries => adjustPathWidths());
 resizeObserver.observe(document.documentElement);
@@ -155,8 +158,8 @@ function sortTable(column) {
 }
 
 cols.forEach((header,i) => {
-	//if (header.dataset.type !== 'path')
-	//	resizeObserver.observe(header);
+	if (header.dataset.type !== 'path')
+		resizeObserver.observe(header);
 	header.addEventListener('click', e => {
 		sortTable(i);
 	});

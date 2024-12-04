@@ -1,19 +1,19 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from './shared/fs';
 import * as utils from './shared/utils';
 import {DebugProtocol} from '@vscode/debugprotocol';
 import {ModuleWebViewProvider} from "./ModulesView";
 import {DllEditorProvider} from "./DLLView";
 import {HexEditorProvider} from "./HexView";
-import * as telemetry from "./telemetry";
+//import * as telemetry from "./telemetry";
 import "./shared/clr";
-//import * as zlib from "zlib";
+
+export let extension_context: vscode.ExtensionContext;
 
 const connectionString = 'InstrumentationKey=a5c3fd08-7ea0-4e3e-880b-6ad15f12e218;IngestionEndpoint=https://eastus-8.in.applicationinsights.azure.com/;LiveEndpoint=https://eastus.livediagnostics.monitor.azure.com/;ApplicationId=1b2b09f8-a9d1-47ff-a545-db7b32df8510';
 
-export function webviewUri(context: vscode.ExtensionContext, webview: vscode.Webview, name: string) {
-	return webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, "assets", name));
+export function webviewUri(webview: vscode.Webview, name: string) {
+	return webview.asWebviewUri(vscode.Uri.joinPath(extension_context.extensionUri, "assets", name));
 }
 
 export async function openPreview(uri: vscode.Uri) {
@@ -27,6 +27,16 @@ export async function openPreview(uri: vscode.Uri) {
 export function getTabGroup(column: number) {
 	return vscode.window.tabGroups.all.find(group => group.viewColumn === column);
 }
+
+export function getTab(uri: vscode.Uri) {
+	for (const group of vscode.window.tabGroups.all) {
+		for (const tab of group.tabs) {
+			if (tab.input instanceof vscode.TabInputCustom && tab.input.uri.toString() === uri.toString())
+				return tab;
+		}
+	}
+}
+
 
 //-----------------------------------------------------------------------------
 //	DebugSession(s)
@@ -114,191 +124,7 @@ export class DebugSession implements vscode.DebugAdapterTracker {
 //	FileSystems
 //-----------------------------------------------------------------------------
 
-export interface FileRange { fromOffset: number; toOffset: number; }
-
-export interface File {
-	dispose(): void;
-	read(pos: number, length: number): Promise<Uint8Array>;
-	write(pos: number, data: Uint8Array): Promise<number>;
-}
-
-export function isFile(obj: any): obj is File {
-	return obj && typeof obj.dispose === 'function' && typeof obj.read === 'function' && typeof obj.write === 'function';
-}
-
-interface FileSystem extends vscode.FileSystemProvider {
-	openFile(uri: vscode.Uri): File | Promise<File>;
-}
-const filesystems: Record<string,FileSystem> = {};
-
-abstract class BaseFileSystem implements FileSystem {
-	protected _onDidChangeFile = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
-	readonly onDidChangeFile: vscode.Event<vscode.FileChangeEvent[]> = this._onDidChangeFile.event;
-
-    constructor(context: vscode.ExtensionContext, scheme: string) {
-        filesystems[scheme] = this;
-		context.subscriptions.push(vscode.workspace.registerFileSystemProvider(scheme, this, { isCaseSensitive: true }));
-    }
-
-    // Abstract method that must be implemented
-    abstract openFile(uri: vscode.Uri): File | Promise<File>;
-    abstract readFile(uri: vscode.Uri): Uint8Array | Thenable<Uint8Array>;
-
-	//stubs
-	watch(uri: vscode.Uri, options: { readonly recursive: boolean; readonly excludes: readonly string[]; }): vscode.Disposable { throw 'not implemented'; }
-	stat(uri: vscode.Uri): vscode.FileStat | Thenable<vscode.FileStat> { throw 'not implemented'; }
-	readDirectory(uri: vscode.Uri): [string, vscode.FileType][] { throw 'not implemented'; }
-	createDirectory(uri: vscode.Uri)  { throw 'not implemented'; }
-	writeFile(uri: vscode.Uri, content: Uint8Array, options: { readonly create: boolean; readonly overwrite: boolean; })  { throw 'not implemented'; }
-	delete(uri: vscode.Uri, options: { readonly recursive: boolean; }): void  { throw 'not implemented'; }
-	rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { readonly overwrite: boolean; })  { throw 'not implemented'; }
-}
-
-export function withOffset(file: File, offset: FileRange) {
-	return new class implements File {
-		length = offset.toOffset - offset.fromOffset;
-		dispose() { file.dispose(); }
-		read(pos: number, length: number) {
-			const start = pos + offset.fromOffset;
-			const end	= Math.min(start + length, offset.toOffset);
-			return file.read(start, end - start);
-		}
-		write(pos: number, data: Uint8Array) {
-			const start = pos + offset.fromOffset;
-			const end	= Math.min(start + data.length, offset.toOffset);
-			return file.write(start, data.subarray(0, end - start));
-		}
-	};
-}
-
-export function openFile(uri: vscode.Uri) {
-	switch (uri.scheme) {
-		case 'file':
-			return NormalFile.open(uri);
-		default:
-			return filesystems[uri.scheme]?.openFile(uri);
-	}
-}
-
-export class NormalFile implements File {
-	constructor(public fd:number) {}
-
-	static open(uri: vscode.Uri) {
-		return new Promise<NormalFile>((resolve, reject) => {
-			fs.open(uri.fsPath, 'r', (err, fd) => {
-				if (err)
-					reject(err);
-				else
-					resolve(new NormalFile(fd));
-			});
-		});
-	}
-	dispose()	{
-		fs.close(this.fd);
-	}
-	read(pos: number, length: number) {
-		return new Promise<Uint8Array>((resolve, reject) => {
-			const buffer = Buffer.alloc(length);
-			fs.read(this.fd, buffer, 0, length, pos, (err, bytesRead, buffer) => {
-				if (err)
-					reject(err);
-				else
-					resolve(new Uint8Array(buffer));
-			});
-		});
-	}
-	write(pos: number, data: Uint8Array): Promise<number> {
-		return new Promise<number>((resolve, reject) => {
-			fs.write(this.fd, data, 0, data.length, pos, (err, bytesWritten) => {
-				if (err)
-					reject(err);
-				else
-					resolve(bytesWritten);
-			});
-		});
-	}
-}
-
-
-function getEncapsulatedUri(uri: vscode.Uri) {
-	return uri.with({
-		scheme: uri.authority,
-		authority: '',
-	});
-//	return vscode.Uri.parse(uri.fsPath);
-}
-
-class ReadOnlyFilesystem extends BaseFileSystem {
-	static SCHEME = 'readonly';
-
-	constructor(context: vscode.ExtensionContext) {
-		super(context, ReadOnlyFilesystem.SCHEME);
-	}
-
-	stat(uri: vscode.Uri) {
-		return vscode.workspace.fs.stat(getEncapsulatedUri(uri)).then(stat => {stat.permissions = vscode.FilePermission.Readonly; return stat; });
-	}
-
-	openFile(uri: vscode.Uri) {
-		return NormalFile.open(getEncapsulatedUri(uri));
-	}
-	readFile(uri: vscode.Uri) {
-		return vscode.workspace.fs.readFile(getEncapsulatedUri(uri));
-	}
-}
-
-export class SubfileFileSystem extends BaseFileSystem {
-	static SCHEME = 'subfile';
-
-	static makeUri(uri: vscode.Uri, offset:number, length:number) {
-		return uri.with({
-			scheme: 'subfile',
-			authority: uri.scheme,
-			fragment: `${offset};${offset + length}`
-		});
-	}
-	static parseUri(uri: vscode.Uri) {
-		const parts = uri.fragment.split(';');
-		return {
-			uri:	getEncapsulatedUri(uri),
-			offset: {fromOffset: +parts[0], toOffset: +parts[1]}
-		};
-	}
-	
-	constructor(context: vscode.ExtensionContext) {
-		super(context, SubfileFileSystem.SCHEME);
-	}
-
-	stat(uri: vscode.Uri) {
-		const { uri: uri2, offset } = SubfileFileSystem.parseUri(uri);
-		return vscode.workspace.fs.stat(uri2).then(stat => {
-			stat.size	= offset.toOffset - offset.fromOffset;
-			return stat;
-		});
-	}
-
-	async readFile(uri: vscode.Uri) {
-		const { uri: uri2, offset } = SubfileFileSystem.parseUri(uri);
-		if (uri2.scheme === 'file') {
-			const file = await NormalFile.open(uri2);
-			try {
-				return file.read(offset.fromOffset, offset.toOffset - offset.fromOffset);
-			} finally {
-				file.dispose();
-			}
-		} else {
-			const data = await vscode.workspace.fs.readFile(uri2);
-			return data.subarray(offset.fromOffset, offset.toOffset);
-		}
-	}
-	async openFile(uri: vscode.Uri) {
-		const { uri: uri2, offset } = SubfileFileSystem.parseUri(uri);
-		const file = await openFile(uri2);
-		return withOffset(file, offset);
-	}
-}
-
-class DebugMemoryFile implements File {
+class DebugMemoryFile implements fs.File {
 	constructor(public session: vscode.DebugSession, public memoryReference: string) {}
 
 	public dispose() {}
@@ -323,10 +149,10 @@ class DebugMemoryFile implements File {
 	}
 }
 
-export class DebugMemoryFileSystem extends BaseFileSystem {
+export class DebugMemoryFileSystem extends fs.BaseFileSystem {
 	static SCHEME = 'modules-debug-memory';
 
-	static makeUri(session: vscode.DebugSession, memoryReference: string, range?: FileRange, displayName = 'memory') {
+	static makeUri(session: vscode.DebugSession, memoryReference: string, range?: fs.FileRange, displayName = 'memory') {
 		return vscode.Uri.from({
 			scheme: this.SCHEME,
 			authority: session.id,
@@ -423,7 +249,7 @@ export class DebugMemoryFileSystem extends BaseFileSystem {
 export class DebugMemory {
 	static SCHEME = 'vscode-debug-memory';
 
-	static makeUri(session: vscode.DebugSession, memoryReference: string, range?: FileRange, displayName = 'memory') {
+	static makeUri(session: vscode.DebugSession, memoryReference: string, range?: fs.FileRange, displayName = 'memory') {
 		return vscode.Uri.from({
 			scheme: DebugMemory.SCHEME,
 			authority: session.id,
@@ -508,6 +334,8 @@ interface ViewMemory {
 }
 
 export function activate(context: vscode.ExtensionContext) {
+	extension_context = context;
+
 	// close unwanted tabgroups
 	const closeTabGroups = context.workspaceState.get<number[]>('closeTabGroups', []);
 	closeTabGroups.forEach(i => {
@@ -528,7 +356,7 @@ export function activate(context: vscode.ExtensionContext) {
 		context.workspaceState.update('closeTabGroups', closeTabGroups);
 	}));
 	
-	context.subscriptions.push(telemetry.init(connectionString));
+	//context.subscriptions.push(telemetry.init(connectionString));
 
 	//override for debug
 	context.subscriptions.push(vscode.commands.registerCommand('workbench.debug.viewlet.action.viewMemory', (params: ViewMemory) => {
@@ -548,8 +376,8 @@ export function activate(context: vscode.ExtensionContext) {
 	new ModuleWebViewProvider(context);
 	new DllEditorProvider(context);
 	
-	new ReadOnlyFilesystem(context);
-	new SubfileFileSystem(context);
+	new fs.ReadOnlyFilesystem(context);
+	new fs.SubfileFileSystem(context);
 	new DebugMemoryFileSystem(context);
 
 	new DebugSource(context);

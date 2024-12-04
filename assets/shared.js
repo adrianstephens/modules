@@ -227,9 +227,7 @@ function template(template, parent, values) {
 		parent.insertBefore(i, before);
 }
 
-//unique identifiers
-
-function generateUniqueId(e) {
+function generateSelector(e) {
 	const path = [];
 	while (e && e.nodeType === Node.ELEMENT_NODE) {
 		let index = 1;

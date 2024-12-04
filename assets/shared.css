@@ -15,6 +15,21 @@ body {
 	color: var(--vscode-foreground);
 }
 
+[icon]::before {
+	content: attr(icon);
+	font: normal normal normal 16px/1 codicon;
+	display: inline-block;
+	text-decoration: none;
+	text-rendering: auto;
+	text-align: center;
+	vertical-align: text-top;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	user-select: none;
+	-webkit-user-select: none;
+	-ms-user-select: none;
+}
+
 .codicon {
 	font: normal normal normal 16px/1 codicon;
 	display: inline-block;
