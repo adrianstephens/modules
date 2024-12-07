@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import * as fs from './shared/fs';
-import * as jsx from "./shared/jsx-runtime";
+import * as fs from '@shared/fs';
+import * as jsx from "@shared/jsx-runtime";
 import * as main from "./extension";
 
 const radices = [
@@ -60,12 +60,12 @@ class HexEditor {
 			enableScripts: true,
 		};
 
-		webview.html = '<!DOCTYPE html>' + jsx.render(<html lang="en">
+		webview.html = '<!DOCTYPE html>' + JSX.render(<html lang="en">
 			<head>
 				<meta charset="UTF-8"/>
 				<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-				<link rel="stylesheet" type="text/css" href={main.webviewUri(webview, 'shared.css')}/>
-				<link rel="stylesheet" type="text/css" href={main.webviewUri(webview, 'hexview.css')}/>
+				<link rel="stylesheet" type="text/css" href={main.webviewUri(webview, 'shared/assets/shared.css')}/>
+				<link rel="stylesheet" type="text/css" href={main.webviewUri(webview, 'assets/hexview.css')}/>
 			</head>
 			<body  data-vscode-context='{"preventDefaultContextMenuItems": true}'>
 				<div class='container'>
@@ -75,8 +75,8 @@ class HexEditor {
 						<div class='text' data-vscode-context='{"section": "text"}'/>
 					</div>
 				</div>
-				<script src={main.webviewUri(webview, 'shared.js')}></script>
-				<script src={main.webviewUri(webview, 'hexview.js')}></script>
+				<script src={main.webviewUri(webview, 'shared/assets/shared.js')}></script>
+				<script src={main.webviewUri(webview, 'assets/hexview.js')}></script>
 			</body>
 		</html>);
 

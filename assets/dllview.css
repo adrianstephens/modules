@@ -1,0 +1,35 @@
+.tree {
+    line-height: 22px;
+    white-space: nowrap;
+    z-index: 1;
+    --depth: 0;
+    --depth2: 0;
+}
+
+.children {
+    --depth2: var(--depth);
+    padding-left: 20px;
+}
+
+.caret {
+    --depth: calc(var(--depth2) + 1);
+
+    &.caret-down > span {
+        position: sticky;
+        top: calc((var(--depth) - 1) * 22px);
+        background-color: var(--vscode-editor-background);
+        z-index: calc(1000 - var(--depth));
+        display: inline-block;
+        width: 100%;
+    }
+}
+
+.stuck {
+    box-shadow: var(--vscode-sideBarStickyScroll-shadow) 0 6px 6px -6px;
+}
+
+.binary {
+    &::before {
+        color: var(--vscode-charts-green);
+    }
+}

@@ -1,7 +1,7 @@
 
 import * as vscode from 'vscode';
 import * as https from 'https';
-import * as utils from './shared/utils';
+import * as utils from '@shared/utils';
 
 //-----------------------------------------------------------------------------
 //	Telemetry

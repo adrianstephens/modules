@@ -1,8 +1,7 @@
 /* eslint-disable no-empty */
 import * as vscode from "vscode";
 import { DebugProtocol } from "@vscode/debugprotocol";
-import { render } from "./shared/jsx-runtime";
-import * as utils from "./shared/utils";
+import * as utils from "@shared/utils";
 import * as main from "./extension";
 
 type DisassembleResponse = DebugProtocol.DisassembleResponse['body'];
@@ -46,18 +45,18 @@ export class DisassemblyView {
 				panel.dispose();
 		});
 
-		panel.webview.html = "<!DOCTYPE html>" + render(<html lang="en">
+		panel.webview.html = "<!DOCTYPE html>" + JSX.render(<html lang="en">
 			<head>
 				<meta charset="utf-8" />
 				<meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no" />
-				<link rel="stylesheet" type="text/css" href={main.webviewUri(panel.webview, "shared.css")} />
-				<link rel="stylesheet" type="text/css" href={main.webviewUri(panel.webview, "disassembly.css")} />
+				<link rel="stylesheet" type="text/css" href={main.webviewUri(panel.webview, "shared/assets/shared.css")} />
+				<link rel="stylesheet" type="text/css" href={main.webviewUri(panel.webview, "assets/disassembly.css")} />
 			</head>
 
 			<body>
 				<div id="root"/>
-				<script src={ main.webviewUri(panel.webview, "shared.js")}></script>
-				<script src={ main.webviewUri(panel.webview, "disassembly.js")}></script>
+				<script src={ main.webviewUri(panel.webview, "shared/assets/shared.js")}></script>
+				<script src={ main.webviewUri(panel.webview, "assets/disassembly.js")}></script>
 			</body>
 		</html>);
 

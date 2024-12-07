@@ -1,13 +1,13 @@
 import * as vscode from 'vscode';
-import * as fs from './shared/fs';
+import * as fs from '@shared/fs';
 import * as path from 'path';
 import { DebugProtocol } from '@vscode/debugprotocol';
-import { render, Icon, CSP, Nonce, codicons, id_selector } from "./shared/jsx-runtime";
+import { Icon, CSP, Nonce, codicons, id_selector } from "@shared/jsx-runtime";
 import * as main from "./extension";
-import * as utils from "./shared/utils";
-import * as pe from "./shared/pe";
-import * as mach from "./shared/mach"
-import * as elf from "./shared/elf"
+import * as utils from "@shared/utils";
+import * as pe from "@shared/pe";
+import * as mach from "@shared/mach"
+import * as elf from "@shared/elf"
 import { DisassemblyView } from "./DisassemblyView";
 
 type IconType0	= string | vscode.Uri;
@@ -179,7 +179,7 @@ function peFile(dll: pe.PE, context: Context) {
 						)
 						: s[0] === 'IMPORT' ? (data2 as [string, any[]][]).map(([name, entries]) =>
 							<TreeParent name={name} icon={icon_dll} selectable>
-								{entries.map(v => <div class='dllentry' icon={codicons.circleSmallFilled}>{v}</div>)}
+								{entries.map(v => <div class='select' data-dll={name} icon={codicons.circleSmallFilled}>{v}</div>)}
 							</TreeParent>
 						)
 						: TreeChildren(data2, context)
@@ -258,14 +258,15 @@ class DllEditor {
 
 		const context: Context = {memory_refs: this.memory_refs};
 		const nonce = Nonce();
-		webview.html = '<!DOCTYPE html>' + render(
+		webview.html = '<!DOCTYPE html>' + JSX.render(
 			<html lang="en">
 				<head>
 					<meta charset="UTF-8"/>
 					<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 					<CSP csp={webview.cspSource} nonce={nonce}/>
-					<link rel="stylesheet" type="text/css" href={main.webviewUri(webview, 'shared.css')}/>
-					<link rel="stylesheet" type="text/css" href={main.webviewUri(webview, 'treeview.css')}/>
+					<link rel="stylesheet" type="text/css" href={main.webviewUri(webview, 'shared/assets/shared.css')}/>
+					<link rel="stylesheet" type="text/css" href={main.webviewUri(webview, 'shared/assets/tree.css')}/>
+					<link rel="stylesheet" type="text/css" href={main.webviewUri(webview, 'assets/dllview.css')}/>
 				</head>
 				<body>
 
@@ -278,16 +279,33 @@ class DllEditor {
 					</TreeParent>
 				</div>
 
-				<script nonce={nonce} src={main.webviewUri(webview, 'shared.js')}></script>
-				<script nonce={nonce} src={main.webviewUri(webview, 'treeview.js')}></script>
+				<script nonce={nonce} src={main.webviewUri(webview, 'shared/assets/shared.js')}></script>
+				<script nonce={nonce} src={main.webviewUri(webview, 'shared/assets/tree.js')}></script>
+				<script nonce={nonce} src={main.webviewUri(webview, 'assets/dllview.js')}></script>
 			</body></html>);
 
 		webview.onDidReceiveMessage(async message => {
-			console.log(message.path);
 			switch (message.command) {
 				case 'select':
 					this.select(message.selector);
-					if (message.offset) {
+					if (message.dll) {
+						//dll import
+						const module	= await findModule(message.dll);
+						if (module) {
+							const path = vscode.Uri.file(module.path!);
+							let editor = DllEditor.map[path.toString()];
+							if (editor) {
+								editor.reveal();
+							} else {
+								await vscode.commands.executeCommand('vscode.open', path, {viewColumn: vscode.ViewColumn.Beside, preview: true});
+								editor = DllEditor.map[path.toString()];
+							}
+							if (editor) {
+								editor.select_entry(message.text);
+							}
+						}
+
+					} else if (message.offset) {
 						//binary
 						const offset	= +message.offset;
 						const length	= +message.length;
@@ -323,30 +341,11 @@ class DllEditor {
 						//vscode.commands.executeCommand('hex.open', file, message.name ?? "binary", {viewColumn: vscode.ViewColumn.Beside, preview: true});
 					} else  {
 						//non-binary
-						const module	= await findModule(message.path);
+						const module	= await findModule(message.text);
 						if (module)
 							vscode.commands.executeCommand('vscode.open', vscode.Uri.file(module.path!), {viewColumn: vscode.ViewColumn.Beside, preview: true});
 					}
 					break;
-
-				case 'dllentry': {
-					const module	= await findModule(message.path);
-					if (module) {
-						const path = vscode.Uri.file(module.path!);
-						let editor = DllEditor.map[path.toString()];
-						if (editor) {
-							editor.reveal();
-						} else {
-							await vscode.commands.executeCommand('vscode.open', path, {viewColumn: vscode.ViewColumn.Beside, preview: true});
-							editor = DllEditor.map[path.toString()];
-						}
-						if (editor) {
-							editor.select_entry(message.entry);
-						}
-					}
-					break;
-				}
-		
 			}
 		});
 

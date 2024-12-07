@@ -1,19 +1,37 @@
+import * as path from 'path';
+const aliases: Record<string, string> = {};
+aliases['@shared'] = path.resolve(__dirname, '..', 'shared', 'src');
+
+import * as _Module from 'module';
+const Module = _Module as any as { _resolveFilename: (request: string, parent: NodeModule, isMain: boolean, options?: any) => string };
+
+const originalResolveFilename = Module._resolveFilename;
+Module._resolveFilename = (request, parent, isMain, options) => {
+	if (request.startsWith('@')) {
+        const parts = request.split('/');
+		const alias = aliases[parts[0]];
+		if (alias)
+			request = [alias, ...parts.slice(1)].join('/');
+    }
+    return originalResolveFilename(request, parent, isMain, options);
+};
+
 import * as vscode from 'vscode';
-import * as fs from './shared/fs';
-import * as utils from './shared/utils';
+import * as fs from '@shared/fs';
+import * as utils from '@shared/utils';
 import {DebugProtocol} from '@vscode/debugprotocol';
 import {ModuleWebViewProvider} from "./ModulesView";
 import {DllEditorProvider} from "./DLLView";
 import {HexEditorProvider} from "./HexView";
 //import * as telemetry from "./telemetry";
-import "./shared/clr";
+import "@shared/clr";
 
 export let extension_context: vscode.ExtensionContext;
 
 const connectionString = 'InstrumentationKey=a5c3fd08-7ea0-4e3e-880b-6ad15f12e218;IngestionEndpoint=https://eastus-8.in.applicationinsights.azure.com/;LiveEndpoint=https://eastus.livediagnostics.monitor.azure.com/;ApplicationId=1b2b09f8-a9d1-47ff-a545-db7b32df8510';
 
 export function webviewUri(webview: vscode.Webview, name: string) {
-	return webview.asWebviewUri(vscode.Uri.joinPath(extension_context.extensionUri, "assets", name));
+	return webview.asWebviewUri(vscode.Uri.joinPath(extension_context.extensionUri, name));
 }
 
 export async function openPreview(uri: vscode.Uri) {

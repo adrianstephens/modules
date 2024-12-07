@@ -1,9 +1,9 @@
 
 import * as vscode from "vscode";
 import * as path from "path";
-import * as utils from "./shared/utils";
+import * as utils from "@shared/utils";
 import {DebugProtocol} from '@vscode/debugprotocol';
-import {CSP, Nonce, render,id_selector} from "./shared/jsx-runtime";
+import {CSP, Nonce, id_selector} from "@shared/jsx-runtime";
 //import * as telemetry from "./telemetry";
 import * as main from "./extension";
 
@@ -268,7 +268,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 			//if (type)
 			//	telemetry.send('view.none', {type});
 
-			return '<!DOCTYPE html>'+ render(<html lang="en">
+			return '<!DOCTYPE html>'+ JSX.render(<html lang="en">
 				<body>
 					No Modules
 				</body>
@@ -303,12 +303,12 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 		const cols		= Object.keys(column_descriptors).filter(k => has_col.has(k));
 		const nonce		= Nonce();
 
-		return '<!DOCTYPE html>' + render(<html lang="en">
+		return '<!DOCTYPE html>' + JSX.render(<html lang="en">
 			<head>
 				<meta charset="UTF-8"/>
 				<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-				<link rel="stylesheet" type="text/css" href={this.getUri('shared.css')}/>
-				<link rel="stylesheet" type="text/css" href={this.getUri('modules.css')}/>
+				<link rel="stylesheet" type="text/css" href={this.getUri('shared/assets/shared.css')}/>
+				<link rel="stylesheet" type="text/css" href={this.getUri('assets/modules.css')}/>
 				<CSP csp={this.view!.webview.cspSource} nonce={nonce}/>
 				<title>Modules</title>
 			</head>
@@ -328,8 +328,8 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 						)}
 					</tbody>
 				</table>
-				<script nonce={nonce} src={this.getUri("shared.js")}></script>
-				<script nonce={nonce} src={this.getUri("modules.js")}></script>
+				<script nonce={nonce} src={this.getUri("shared/assets/shared.js")}></script>
+				<script nonce={nonce} src={this.getUri("assets/modules.js")}></script>
 			</body>
 		</html>);
 	}
