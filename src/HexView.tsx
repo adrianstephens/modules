@@ -63,6 +63,7 @@ class HexEditor {
 			<head>
 				<meta charset="UTF-8"/>
 				<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+				<title style='font-style: italic;'>My Hex Editor</title>
 				<link rel="stylesheet" type="text/css" href={main.webviewUri(webview, 'shared/assets/shared.css')}/>
 				<link rel="stylesheet" type="text/css" href={main.webviewUri(webview, 'assets/hexview.css')}/>
 			</head>
@@ -268,6 +269,7 @@ export class HexEditorProvider implements vscode.CustomReadonlyEditorProvider {
 			if (isStreamingData(p0)) {
 				let title	= `binary`;
 				let column	= vscode.ViewColumn.Active;
+				let preview	= false;
 
 				let p1		= params.shift();
 				if (typeof p1 === 'string') {
@@ -276,6 +278,10 @@ export class HexEditorProvider implements vscode.CustomReadonlyEditorProvider {
 				}
 				if (typeof p1 === 'number') {
 					column	= p1;
+					p1		= params.shift();
+				} else if ('viewColumn' in p1) {
+					column	= p1.viewColumn;
+					preview = p1.preview;
 					p1		= params.shift();
 				}
 

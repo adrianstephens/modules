@@ -300,9 +300,9 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 			<head>
 				<meta charset="UTF-8"/>
 				<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+				<CSP csp={this.view!.webview.cspSource} nonce={nonce}/>
 				<link rel="stylesheet" type="text/css" href={this.getUri('shared/assets/shared.css')}/>
 				<link rel="stylesheet" type="text/css" href={this.getUri('assets/modules.css')}/>
-				<CSP csp={this.view!.webview.cspSource} nonce={nonce}/>
 				<title>Modules</title>
 			</head>
 			<body>

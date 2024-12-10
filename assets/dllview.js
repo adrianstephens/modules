@@ -28,18 +28,6 @@ document.addEventListener("scroll", event => {
 	updateStuck();
 });
 
-document.querySelectorAll('.select').forEach(item => {
-	item.addEventListener('click', event => {
-		vscode.postMessage({
-			command: 'select',
-			selector: generateSelector(item),
-			text: item.textContent,
-			...item.dataset
-		})
-		event.stopPropagation();
-	});
-});
-
 window.addEventListener('message', event => {
 	const e = event.data;
     switch (e.command) {

@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'shared/src/fs';
 import * as path from 'path';
 import { DebugProtocol } from '@vscode/debugprotocol';
-import { Icon, CSP, Nonce, codicons, id_selector } from "shared/src/jsx-runtime";
+import { Icon, CSP, Nonce, codicons, iconAttributes } from "shared/src/jsx-runtime";
 import * as main from "./extension";
 import * as utils from "shared/src/utils";
 import * as pe from "shared/src/pe";
@@ -18,19 +18,15 @@ type IconType	= IconType0 | vscode.ThemeIcon | {
 
 const folder 		= new vscode.ThemeIcon('folder', new vscode.ThemeColor('charts.blue'));
 const section 		= new vscode.ThemeIcon('folder', new vscode.ThemeColor('charts.yellow'));
-const icon_group 	= new vscode.ThemeIcon('circleLargeFilled', new vscode.ThemeColor('charts.blue'));
-const icon_binary 	= new vscode.ThemeIcon('fileBinary', new vscode.ThemeColor('charts.green'));
-const icon_item 	= 'circleSmallFilled';
 const icon_dll		= new vscode.ThemeIcon('fileSymlinkFile', new vscode.ThemeColor('charts.red'));
 
-function TreeParent(props: {name: string, icon?: IconType, open?: boolean, selectable?: boolean, children?: any}) {
-	return <div class={'caret' + (props.open ? ' caret-down' : '')} id={props.name}>
-		<span>
-			{props.icon && <Icon icon={props.icon}/>}
-			{props.selectable ? <span class='select'>{props.name}</span> : props.name}
+function TreeParent({name, icon, open, selectable, children, ...others}: {name: string, icon?: IconType, open?: boolean, selectable?: boolean, children?: any} & Record<string, any>) {
+	return <div class={'caret' + (open ? ' caret-down' : '')} id={name}>
+		<span class={selectable ? 'select' : undefined} {...iconAttributes(icon)} {...others}>
+			{name}
 		</span>
 		<div class="children">
-			{props.children}
+			{children}
 		</div>
 	</div>;
 }
@@ -67,7 +63,6 @@ function Memory({name, mm, context}: {name?: string, mm: utils.MappedMemory, con
 	</div>;
 }
 
-
 function TreeItem({name, value, context}: {name?: string, value: any, context: Context}) {
 	switch (typeof value) {
 		case 'undefined':
@@ -98,7 +93,7 @@ function TreeItem({name, value, context}: {name?: string, value: any, context: C
 			}
 
 		default:
-			return <div><Icon icon={icon_item}/> {`${name}: ${value}`}</div>;
+			return <div icon={codicons.circleSmallFilled}>{`${name}: ${value}`}</div>;
 	}
 }
 /*
@@ -159,9 +154,21 @@ function peFile(dll: pe.PE, context: Context) {
 		<TreeParent name="Optional Header" icon={folder} children={TreeChildren(opt, context)}/>
 
 		<TreeParent name="Sections" icon={folder} open={true}>
-			{dll.sections.map(s =>
-				<TreeParent name={s.Name} icon={section} children={TreeChildren(s, context)}/>
-			)}
+			{dll.sections.map(s => {
+				//<TreeParent name={s.Name} icon={section} children={TreeChildren(s, context)}/>
+				if (s.data) {
+					const mm = s.data;
+					context.memory_refs[mm.data.byteOffset] = mm.data;
+					return <TreeParent
+						name={`${s.Name}: 0x${mm.address.toString(16)}[0x${mm.data!.byteLength.toString(16)}] ${MemoryFlags(mm.flags)}`}
+						icon={section} selectable
+						data-offset={mm.data.byteOffset} data-length={mm.data.byteLength} data-address={mm.address} data-flags={mm.flags}
+						children={TreeChildren(s, context)}
+					/>;
+				} else {
+					return <TreeParent name={s.Name} icon={section} children={TreeChildren(s, context)}/>;
+				}
+			})}
 		</TreeParent>
 
 		<TreeParent name="Directories" icon={folder} open={true}>
@@ -319,14 +326,12 @@ class DllEditor {
 							new DisassemblyView(main.extension_context, session, address, length, `Disassembly @ 0x${address.toString(16)}`, vscode.ViewColumn.Beside);
 							return;
 						}
-			/*
 						// if it's in memory_refs, use it
 						const ref = this.memory_refs[offset];
 						if (ref) {
-							vscode.commands.executeCommand('hex.open', ref, message.name ?? "binary", {viewColumn: vscode.ViewColumn.Beside, preview: true});
+							vscode.commands.executeCommand('hex.open', ref, message.text, {viewColumn: vscode.ViewColumn.Beside, preview: true});
 							return;
 						}
-			*/
 						// otherwise see if it's in debug memory
 						if (module) {
 							const uri = main.DebugMemoryFileSystem.makeUri(session, `0x${address.toString(16)}`, {fromOffset: 0, toOffset: length});
