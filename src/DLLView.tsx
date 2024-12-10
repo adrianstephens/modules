@@ -1,13 +1,13 @@
 import * as vscode from 'vscode';
-import * as fs from '@shared/fs';
+import * as fs from 'shared/src/fs';
 import * as path from 'path';
 import { DebugProtocol } from '@vscode/debugprotocol';
-import { Icon, CSP, Nonce, codicons, id_selector } from "@shared/jsx-runtime";
+import { Icon, CSP, Nonce, codicons, id_selector } from "shared/src/jsx-runtime";
 import * as main from "./extension";
-import * as utils from "@shared/utils";
-import * as pe from "@shared/pe";
-import * as mach from "@shared/mach"
-import * as elf from "@shared/elf"
+import * as utils from "shared/src/utils";
+import * as pe from "shared/src/pe";
+import * as mach from "shared/src/mach"
+import * as elf from "shared/src/elf"
 import { DisassemblyView } from "./DisassemblyView";
 
 type IconType0	= string | vscode.Uri;
@@ -191,6 +191,7 @@ function peFile(dll: pe.PE, context: Context) {
 }
 
 function machFile(file: mach.MachFile, context: Context) {
+	const names = Object.fromEntries(Object.entries(mach.CMD).map(([k, v]) => [v, k]));
 	return <>
 	<TreeParent name="Header" icon={folder}>
 		{TreeChildren(file.header, context)}
@@ -198,8 +199,7 @@ function machFile(file: mach.MachFile, context: Context) {
 
 		<TreeParent name="Commands" icon={folder} open={true}>
 		{file.commands.map(c =>
-			//<TreeItem name={mach.CMD[c.cmd]} value={c.data}></TreeItem>
-			<TreeParent name={mach.CMD[c.cmd]} icon={section}>
+			<TreeParent name={names[c.cmd]} icon={section}>
 				{TreeChildren(c.data, context)}
 			</TreeParent>
 		)}

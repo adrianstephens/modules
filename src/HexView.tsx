@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
-import * as fs from '@shared/fs';
-import * as jsx from "@shared/jsx-runtime";
+import * as fs from 'shared/src/fs';
 import * as main from "./extension";
 
 const radices = [

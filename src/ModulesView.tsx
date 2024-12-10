@@ -1,9 +1,9 @@
 
 import * as vscode from "vscode";
 import * as path from "path";
-import * as utils from "@shared/utils";
+import * as utils from "shared/src/utils";
 import {DebugProtocol} from '@vscode/debugprotocol';
-import {CSP, Nonce, id_selector} from "@shared/jsx-runtime";
+import {CSP, Nonce, id_selector} from "shared/src/jsx-runtime";
 //import * as telemetry from "./telemetry";
 import * as main from "./extension";
 
@@ -147,7 +147,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 
 		webviewView.webview.options = {
 			enableScripts: true,
-			localResourceRoots: [vscode.Uri.joinPath(main.extension_context.extensionUri, 'assets')]
+			localResourceRoots: [main.extension_context.extensionUri]
 		};
 
 		webviewView.webview.onDidReceiveMessage(async message => {
@@ -181,20 +181,13 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 				case 'path': {
 					const m = this.modules[message.id];
 					if (m.path && await vscode.workspace.fs.stat(vscode.Uri.file(m.path)).then(()=>true, ()=>false)) {
-						vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(m.path), 'modules.dllView', {preview: true});
+						vscode.commands.executeCommand('vscode.open', vscode.Uri.file(m.path), {preview: true});
 					} else if (this.session && m.addressRange) {
 						const uri = main.DebugMemoryFileSystem.makeUri(this.session, m.addressRange, {fromOffset:0, toOffset:m.vsModuleSize}, m.name);
-						vscode.commands.executeCommand('vscode.openWith', uri, 'modules.dllView', {preview: true});
+						vscode.commands.executeCommand('vscode.open', uri, {preview: true});
 					}
 					break;
 				}
-				case 'open': {
-					if (await vscode.workspace.fs.stat(vscode.Uri.file(message.path)).then(()=>true, ()=>false)) {
-						vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.path), {preview: true});
-					}
-					break;
-				}
-
 			}
 		});
 

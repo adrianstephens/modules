@@ -1,7 +1,7 @@
 /* eslint-disable no-empty */
 import * as vscode from "vscode";
 import { DebugProtocol } from "@vscode/debugprotocol";
-import * as utils from "@shared/utils";
+import * as utils from "shared/src/utils";
 import * as main from "./extension";
 
 type DisassembleResponse = DebugProtocol.DisassembleResponse['body'];

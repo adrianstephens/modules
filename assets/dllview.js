@@ -53,7 +53,7 @@ window.addEventListener('message', event => {
 			break;
 
 		case 'scroll_to':
-			reveal(document.querySelector(event.data.selector));
+			tree.reveal(document.querySelector(event.data.selector));
 			break;
 
 	}

@@ -19,6 +19,7 @@
 		"out/**/*.js",
 		"assets/*",
 		"!assets/*.psd",
+		"shared/assets/*",
 		"LICENSE.txt"
 	],
 	"engines": {
@@ -30,17 +31,24 @@
 	],
 	"activationEvents": [],
 	"main": "./out/src/extension.js",
-
 	"contributes": {
 		"customEditors": [
 			{
 				"viewType": "modules.dllView",
 				"displayName": "DLL Viewer",
 				"selector": [
-					{"filenamePattern": "*.dll"},
-					{"filenamePattern": "*.exe"},
-					{"filenamePattern": "*.dylib"},
-					{"filenamePattern": "*.elf"}
+					{
+						"filenamePattern": "*.dll"
+					},
+					{
+						"filenamePattern": "*.exe"
+					},
+					{
+						"filenamePattern": "*.dylib"
+					},
+					{
+						"filenamePattern": "*.elf"
+					}
 				]
 			},
 			{
@@ -48,19 +56,22 @@
 				"displayName": "ELF Viewer",
 				"priority": "option",
 				"selector": [
-					{"filenamePattern": "*"}
+					{
+						"filenamePattern": "*"
+					}
 				]
 			},
 			{
 				"viewType": "hex.view",
 				"displayName": "Hex Viewer",
 				"selector": [
-					{"filenamePattern": "*"}
+					{
+						"filenamePattern": "*"
+					}
 				],
 				"priority": "option"
 			}
 		],
-
 		"views": {
 			"debug": [
 				{
@@ -70,7 +81,6 @@
 				}
 			]
 		},
-
 		"commands": [
 			{
 				"command": "modules.sendDAPRequest",
@@ -83,9 +93,9 @@
 			{
 				"command": "hex.reopen",
 				"title": "Reopen in Hex",
-                "icon": "$(file-binary)"
+				"icon": "$(file-binary)"
 			},
-			{   
+			{
 				"command": "hex.bytesPerLine",
 				"title": "Columns"
 			},
@@ -109,44 +119,49 @@
 				"command": "hex.goto",
 				"title": "Goto..."
 			},
-			{	"command": "hex.addHighlight",
-            	"title": "Add highlight"
-            },
+			{
+				"command": "hex.addHighlight",
+				"title": "Add highlight"
+			},
 			{
 				"command": "hex.removeHighlight",
 				"title": "Remove Highlight"
 			}
 		],
-
-
-		"keybindings":[
-			{ "command": "hex.copy_hex",	"key": "ctrl+c", "when": "activeCustomEditorId == hex.view"},
-			{ "command": "hex.goto",	    "key": "ctrl+g", "when": "activeCustomEditorId == hex.view"}
+		"keybindings": [
+			{
+				"command": "hex.copy_hex",
+				"key": "ctrl+c",
+				"when": "activeCustomEditorId == hex.view"
+			},
+			{
+				"command": "hex.goto",
+				"key": "ctrl+g",
+				"when": "activeCustomEditorId == hex.view"
+			}
 		],
-
 		"menus": {
 			"editor/title": [
-                {
+				{
 					"command": "hex.reopen",
 					"when": "activeCustomEditorId != hex.view",
 					"group": "navigation"
 				},
-                {
+				{
 					"command": "hex.radix",
 					"when": "activeCustomEditorId == hex.view",
 					"group": "navigation@1"
 				},
-                {
+				{
 					"command": "hex.text",
 					"when": "activeCustomEditorId == hex.view",
 					"group": "navigation@2"
 				},
-                {
+				{
 					"command": "hex.bytesPerLine",
 					"when": "activeCustomEditorId == hex.view",
 					"group": "navigation@3"
 				}
-
 			],
 			"webview/context": [
 				{

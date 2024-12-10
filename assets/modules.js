@@ -4,7 +4,7 @@ let sort_direction = 1;
 const table 	= document.querySelector('table');
 const cols  	= table.querySelectorAll('th');
 
-const vscroll 	= new ScrollBar(document.body, document.documentElement, false);
+const vscroll 	= new ScrollBar(document.body, VScrollContainer(document.documentElement, 25), false);
 const hscroll 	= new ScrollBar(document.body, document.documentElement, true);
 
 function adjustPathWidths() {
@@ -24,7 +24,6 @@ window.addEventListener("scroll", () => {
 	vscroll.update();
 });
 
-//cols[0].classList.add('sort');
 document.addEventListener('DOMContentLoaded', () => {
 	vscode.postMessage({command: 'ready'});
 
@@ -171,14 +170,6 @@ table.querySelectorAll('tbody tr').forEach(row => row.addEventListener('click', 
 		id: row.id
 	})
 ));
-/*
-table.querySelectorAll('td.path').forEach(path => path.addEventListener('click', event =>
-	vscode.postMessage({
-		command: 'open',
-		path: path.getAttribute("title")
-	})
-));
-*/
 
 window.addEventListener('message', event => {
 	switch (event.data.command) {
