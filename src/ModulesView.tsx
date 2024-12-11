@@ -180,11 +180,17 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 				}
 				case 'path': {
 					const m = this.modules[message.id];
+					let uri;
 					if (m.path && await vscode.workspace.fs.stat(vscode.Uri.file(m.path)).then(()=>true, ()=>false)) {
-						vscode.commands.executeCommand('vscode.open', vscode.Uri.file(m.path), {preview: true});
+						uri = vscode.Uri.file(m.path);
 					} else if (this.session && m.addressRange) {
-						const uri = main.DebugMemoryFileSystem.makeUri(this.session, m.addressRange, {fromOffset:0, toOffset:m.vsModuleSize}, m.name);
-						vscode.commands.executeCommand('vscode.open', uri, {preview: true});
+						uri = main.DebugMemoryFileSystem.makeUri(this.session, m.addressRange, {fromOffset:0, toOffset:m.vsModuleSize}, m.name);
+					}
+					if (uri) {
+						if (path.extname(m.name))
+							vscode.commands.executeCommand('vscode.open', uri, {preview: true});
+						else
+							vscode.commands.executeCommand('vscode.openWith', uri, 'modules.dllView', {preview: true});
 					}
 					break;
 				}
