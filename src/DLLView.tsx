@@ -5,6 +5,7 @@ import { DebugProtocol } from '@vscode/debugprotocol';
 import { Icon, CSP, Nonce, codicons, iconAttributes } from "shared/src/jsx-runtime";
 import * as main from "./extension";
 import * as utils from "shared/src/utils";
+import * as binary from 'shared/src/binary';
 import * as pe from "shared/src/pe";
 import * as mach from "shared/src/mach"
 import * as elf from "shared/src/elf"
@@ -82,12 +83,12 @@ function TreeItem({name, value, context}: {name?: string, value: any, context: C
 
 			} else if (Array.isArray(value[0]) && value[0].length === 2 && typeof(value[0][0] === 'string')) {
 				return <TreeParentMaybe name={name} icon={section}>
-					{value.map(([name, value]: [string, any]) => <TreeItem name={name} value={value} context={context}/> )}
+					{value.slice(0,1000).map(([name, value]: [string, any]) => <TreeItem name={name} value={value} context={context}/> )}
 				</TreeParentMaybe>
 
 			} else {
 				return <TreeParentMaybe name={name} icon={section}>
-					{Object.entries(value).map(([name, value]) => <TreeItem name={name} value={value} context={context}/>)}
+					{Object.entries(value).slice(0,1000).map(([name, value]) => <TreeItem name={name} value={value} context={context}/>)}
 				</TreeParentMaybe>
 
 			}
@@ -126,6 +127,21 @@ async function findModule(name: string) {
 //	PORTABLE EXECUTABLE
 //-----------------------------------------------------------------------------
 
+function getMemory(uri: vscode.Uri, data: Uint8Array) : binary.memory {
+	if (uri.scheme === main.DebugMemoryFileSystem.SCHEME) {
+		const {session} = main.DebugMemoryFileSystem.parseUri(uri);
+		return {
+			async get(address: bigint, len?: number) {
+				const resp = await session.session.customRequest('readMemory', {offset:address, count: len});
+				return new Uint8Array(resp.data.data);
+			}
+		}
+		
+	} else {
+		return binary.arrayMemory(data)
+	}
+}
+
 class DLLDocument implements vscode.CustomDocument {
 	pe?:		pe.PE;
 	mach?:		mach.MachFile;
@@ -136,7 +152,7 @@ class DLLDocument implements vscode.CustomDocument {
 		if (pe.PE.check(data))
 			this.pe = new pe.PE(data);
 		else if (mach.MachFile.check(data))
-			this.mach = new mach.MachFile(data);
+			this.mach = new mach.MachFile(data, getMemory(uri, data));
 		else if (mach.FATMachFile.check(data))
 			this.fatMach = new mach.FATMachFile(data);
 		else if (elf.ELFFile.check(data))
