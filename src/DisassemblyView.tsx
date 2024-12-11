@@ -37,8 +37,11 @@ export class DisassemblyView {
 		}
 	}
 
-	constructor(private context: vscode.ExtensionContext, private session: vscode.DebugSession, private address:number, length:number, title: string, column: vscode.ViewColumn) {
-		const panel = vscode.window.createWebviewPanel("modules.disassembly", title, column, { enableScripts: true });
+	constructor(panel: vscode.WebviewPanel, private session: vscode.DebugSession, private address:number, length:number) {
+		//constructor(private context: vscode.ExtensionContext, private session: vscode.DebugSession, private address:number, length:number, title: string, column: vscode.ViewColumn) {
+		//const panel = vscode.window.createWebviewPanel("modules.disassembly", title, column, { enableScripts: true });
+
+		panel.webview.options = {enableScripts: true};
 
 		main.DebugSession.get_wrapper(session.id).onDidChangeState(state => {
 			if (state === main.State.Inactive)
@@ -84,10 +87,15 @@ export class DisassemblyView {
 		});
 
 		panel.onDidDispose(() => recv.dispose());
-		panel.onDidChangeViewState(event => {
-			console.log(event);
-		});
+		//panel.onDidChangeViewState(event => {
+		//	console.log(event);
+		//});
 
+	}
+
+	static create(session: vscode.DebugSession, address:number, length:number, title: string, column: vscode.ViewColumn) {
+		const panel = vscode.window.createWebviewPanel("modules.disassembly", title, column, { enableScripts: true });
+		return new DisassemblyView(panel, session, address, length);
 	}
 
 	getAddress(offset: number) {
@@ -136,4 +144,30 @@ export class DisassemblyView {
 		}
 	}
 
+}
+class DisassemblyDocument implements vscode.CustomDocument {
+	constructor(readonly uri: vscode.Uri) {}
+	resolve(webviewPanel: vscode.WebviewPanel) {
+		if (this.uri.scheme === main.DebugMemoryFileSystem.SCHEME) {
+			const {session, offset, memoryReference} = main.DebugMemoryFileSystem.parseUri(this.uri);
+			new DisassemblyView(webviewPanel, session.session, +memoryReference + (offset?.fromOffset ?? 0), offset?.toOffset ?? 1024);
+		}
+	}
+	dispose() {}
+}
+
+export class DisassemblyEditorProvider implements vscode.CustomReadonlyEditorProvider {
+
+	constructor(context: vscode.ExtensionContext) {
+		context.subscriptions.push(vscode.window.registerCustomEditorProvider('modules.disassembly', this));
+	}
+
+	async openCustomDocument(uri: vscode.Uri, openContext: vscode.CustomDocumentOpenContext, token: vscode.CancellationToken): Promise<vscode.CustomDocument> {
+		return new DisassemblyDocument(uri);
+	}
+
+	async resolveCustomEditor(doc: DisassemblyDocument, webviewPanel: vscode.WebviewPanel, token: vscode.CancellationToken): Promise<void> {
+		doc.resolve(webviewPanel);
+	}
+	
 }

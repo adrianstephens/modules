@@ -4,6 +4,7 @@ import {DebugProtocol} from '@vscode/debugprotocol';
 import {ModuleWebViewProvider} from "./ModulesView";
 import {DllEditorProvider} from "./DLLView";
 import {HexEditorProvider} from "./HexView";
+import {DisassemblyEditorProvider} from "./DisassemblyView";
 
 //import * as telemetry from "./telemetry";
 //const connectionString = 'InstrumentationKey=a5c3fd08-7ea0-4e3e-880b-6ad15f12e218;IngestionEndpoint=https://eastus-8.in.applicationinsights.azure.com/;LiveEndpoint=https://eastus.livediagnostics.monitor.azure.com/;ApplicationId=1b2b09f8-a9d1-47ff-a545-db7b32df8510';
@@ -35,7 +36,6 @@ export function getTab(uri: vscode.Uri) {
 		}
 	}
 }
-
 
 //-----------------------------------------------------------------------------
 //	DebugSession(s)
@@ -344,14 +344,19 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	// monitor tabgroups
-	const closeTypes = new Set([
-		"mainThreadWebview-modules.disassembly",
-		"mainThreadWebview-hex.view"],
-	);
+	const closeTypes = [
+		"modules.disassembly",
+		"hex.view"
+	];
+	function mustClose(input: any) {
+		const type = input.viewType;
+		return typeof type === 'string'
+			&& (closeTypes.includes(type.startsWith('mainThreadWebview-') ? type.substring(18) : type));
+	}
 	context.subscriptions.push(vscode.window.tabGroups.onDidChangeTabGroups((e: vscode.TabGroupChangeEvent) => {
-		const closeTabGroups = vscode.window.tabGroups.all.filter(group =>
-			group.tabs.length && group.tabs.every(tab => tab.input instanceof vscode.TabInputWebview && closeTypes.has(tab.input.viewType))
-		).map(group => group.viewColumn);
+		const closeTabGroups = vscode.window.tabGroups.all
+			.filter(group	=> group.tabs.length && group.tabs.every(tab => mustClose(tab.input)))
+			.map(group		=> group.viewColumn);
 		context.workspaceState.update('closeTabGroups', closeTabGroups);
 	}));
 	
@@ -374,6 +379,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	new ModuleWebViewProvider(context);
 	new DllEditorProvider(context);
+	new DisassemblyEditorProvider(context);
 	
 	new fs.ReadOnlyFilesystem(context);
 	new fs.SubfileFileSystem(context);

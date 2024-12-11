@@ -292,6 +292,7 @@ class DllEditor {
 			</body></html>);
 
 		webview.onDidReceiveMessage(async message => {
+			const viewOptions	= {viewColumn: vscode.ViewColumn.Beside, preview: true, preserveFocus: true};
 			switch (message.command) {
 				case 'select':
 					this.select(message.selector);
@@ -304,7 +305,7 @@ class DllEditor {
 							if (editor) {
 								editor.reveal();
 							} else {
-								await vscode.commands.executeCommand('vscode.open', path, {viewColumn: vscode.ViewColumn.Beside, preview: true});
+								await vscode.commands.executeCommand('vscode.open', path, viewOptions);
 								editor = DllEditor.map[path.toString()];
 							}
 							if (editor) {
@@ -323,32 +324,34 @@ class DllEditor {
 							
 						// if exec is set, see if we can disassemble it
 						if (module && (flags & utils.MEM.EXECUTE) && await DisassemblyView.canDisassemble(session, address)) {
-							new DisassemblyView(main.extension_context, session, address, length, `Disassembly @ 0x${address.toString(16)}`, vscode.ViewColumn.Beside);
+							//DisassemblyView.create(session, address, length, `Disassembly @ 0x${address.toString(16)}`, vscode.ViewColumn.Beside);
+							const uri = main.DebugMemoryFileSystem.makeUri(session, `0x${address.toString(16)}`, {fromOffset: 0, toOffset: length}, `0x${address.toString(16)}.disassembly`);
+							vscode.commands.executeCommand('vscode.open', uri, viewOptions);
 							return;
 						}
 						// if it's in memory_refs, use it
 						const ref = this.memory_refs[offset];
 						if (ref) {
-							vscode.commands.executeCommand('hex.open', ref, message.text, {viewColumn: vscode.ViewColumn.Beside, preview: true});
+							vscode.commands.executeCommand('hex.open', ref, message.text, viewOptions);
 							return;
 						}
 						// otherwise see if it's in debug memory
 						if (module) {
 							const uri = main.DebugMemoryFileSystem.makeUri(session, `0x${address.toString(16)}`, {fromOffset: 0, toOffset: length});
-							vscode.commands.executeCommand('vscode.openWith', uri, 'hex.view', {viewColumn: vscode.ViewColumn.Beside, preview: true});
+							vscode.commands.executeCommand('vscode.openWith', uri, 'hex.view', viewOptions);
 							return;
 						}
 				
 						// otherwise load and use it from disk (or whatever)
 						const uri	= fs.withOffset(dll.uri, {fromOffset: offset, toOffset: offset + length});
-						vscode.commands.executeCommand('vscode.openWith', uri, 'hex.view', {viewColumn: vscode.ViewColumn.Beside, preview: true});
+						vscode.commands.executeCommand('vscode.openWith', uri, 'hex.view', viewOptions);
 						//const file	= main.withOffset(await main.openFile(dll.uri), {fromOffset: offset, toOffset: offset + length});
 						//vscode.commands.executeCommand('hex.open', file, message.name ?? "binary", {viewColumn: vscode.ViewColumn.Beside, preview: true});
 					} else  {
 						//non-binary
 						const module	= await findModule(message.text);
 						if (module)
-							vscode.commands.executeCommand('vscode.open', vscode.Uri.file(module.path!), {viewColumn: vscode.ViewColumn.Beside, preview: true});
+							vscode.commands.executeCommand('vscode.open', vscode.Uri.file(module.path!), viewOptions);
 					}
 					break;
 			}

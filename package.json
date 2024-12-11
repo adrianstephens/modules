@@ -62,6 +62,15 @@
 				]
 			},
 			{
+				"viewType": "modules.disassembly",
+				"displayName": "Disassemly Viewer",
+				"selector": [
+					{
+						"filenamePattern": "*.disassembly"
+					}
+				]
+			},
+			{
 				"viewType": "hex.view",
 				"displayName": "Hex Viewer",
 				"selector": [
