@@ -16,11 +16,18 @@
 
     &.caret-down > span {
         position: sticky;
-        top: calc((var(--depth) - 1) * 22px);
+        padding-top: 1px;
+        top: calc((var(--depth) - 1) * 23px);
         background-color: var(--vscode-editor-background);
-        z-index: calc(1000 - var(--depth));
+        z-index: calc(20 - var(--depth));
         display: inline-block;
         width: 100%;
+    }
+
+	&.caret-down::before {
+        position: sticky;
+        padding-top: 4px;
+        top: calc((var(--depth) - 1) * 23px);
     }
 }
 

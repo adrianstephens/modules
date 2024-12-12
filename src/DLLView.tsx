@@ -1,14 +1,15 @@
 import * as vscode from 'vscode';
-import * as fs from 'shared/src/fs';
+import * as fs from 'shared/fs';
 import * as path from 'path';
 import { DebugProtocol } from '@vscode/debugprotocol';
-import { CSP, Nonce, codicons, iconAttributes } from "shared/src/jsx-runtime";
+import { CSP, Nonce, codicons, iconAttributes } from "shared/jsx-runtime";
 import * as main from "./extension";
-import * as utils from "shared/src/utils";
-import * as binary from 'shared/src/binary';
-import * as pe from "shared/src/pe";
-import * as mach from "shared/src/mach"
-import * as elf from "shared/src/elf"
+import * as debug from "./debug";
+import * as utils from "shared/utils";
+import * as binary from 'shared/binary';
+import * as pe from "shared/pe";
+import * as mach from "shared/mach"
+import * as elf from "shared/elf"
 import { DisassemblyView } from "./DisassemblyView";
 
 type IconType0	= string | vscode.Uri;
@@ -133,13 +134,13 @@ async function getDebugMemory(session: vscode.DebugSession, address: bigint, len
 
 	const resp = await session.customRequest('readMemory', {memoryReference, count: len});
 	if (!resp.data)
-		return new Uint8Array(0);;
+		return new Uint8Array(0);
 
 	const b = Buffer.from(resp.data, 'base64');
 	if (!resp.unreadableBytes)
 		return new Uint8Array(b);
 
-	let result = new Uint8Array(len);
+	const result = new Uint8Array(len);
 	b.copy(result);
 
 	for (let offset = b.length + resp.unreadableBytes; offset < len;) {
@@ -164,8 +165,8 @@ async function getDebugMemory(session: vscode.DebugSession, address: bigint, len
 }
 
 function getMemory(uri: vscode.Uri, data: Uint8Array) : binary.memory|undefined {
-	if (uri.scheme === main.DebugMemoryFileSystem.SCHEME) {
-		const {session} = main.DebugMemoryFileSystem.parseUri(uri);
+	if (uri.scheme === debug.MemoryFileSystem.SCHEME) {
+		const {session} = debug.MemoryFileSystem.parseUri(uri);
 		return {
 			async get(address: bigint, len: number) { return getDebugMemory(session.session, address, len); }
 		}
@@ -372,7 +373,7 @@ class DllEditor {
 						// if exec is set, see if we can disassemble it
 						if (module && (flags & utils.MEM.EXECUTE) && await DisassemblyView.canDisassemble(session, address)) {
 							//DisassemblyView.create(session, address, length, `Disassembly @ 0x${address.toString(16)}`, vscode.ViewColumn.Beside);
-							const uri = main.DebugMemoryFileSystem.makeUri(session, `0x${address.toString(16)}`, {fromOffset: 0, toOffset: length}, `0x${address.toString(16)}.disassembly`);
+							const uri = debug.MemoryFileSystem.makeUri(session, `0x${address.toString(16)}`, {fromOffset: 0, toOffset: length}, `0x${address.toString(16)}.disassembly`);
 							vscode.commands.executeCommand('vscode.open', uri, viewOptions);
 							return;
 						}
@@ -384,7 +385,7 @@ class DllEditor {
 						}
 						// otherwise see if it's in debug memory
 						if (module) {
-							const uri = main.DebugMemoryFileSystem.makeUri(session, `0x${address.toString(16)}`, {fromOffset: 0, toOffset: length});
+							const uri = debug.MemoryFileSystem.makeUri(session, `0x${address.toString(16)}`, {fromOffset: 0, toOffset: length});
 							vscode.commands.executeCommand('vscode.openWith', uri, 'hex.view', viewOptions);
 							return;
 						}

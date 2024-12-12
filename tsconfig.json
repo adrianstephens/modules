@@ -1,5 +1,4 @@
 {
-	"$schema": "./tsconfig.schema.json",
 	"compilerOptions": {
 		"target": "es2022",
 		"module": "CommonJS",
@@ -7,15 +6,20 @@
 		"lib": [
 			"es2022"
 		],
-		"baseUrl": ".",
 		"outDir": "out",
 		"sourceMap": true,
 		"strict": true,
 		"rootDir": ".",
 		"jsx": "react-jsx",
-		"jsxImportSource": "shared/src",
+		"jsxImportSource": "shared",
 		"forceConsistentCasingInFileNames": true,
-		"rewriteImports": true
+		"rewriteImports": true,
+		"baseUrl": "src",
+		"paths": {
+			"shared/*": [
+				"../shared/src/*"
+			]
+		}
 	},
 	"include": ["src/extension.ts", "shared/src/jsx.d.ts"],
 	"exclude": ["node_modules", ".vscode-test", "hidden"]

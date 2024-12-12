@@ -1,8 +1,9 @@
 /* eslint-disable no-empty */
 import * as vscode from "vscode";
 import { DebugProtocol } from "@vscode/debugprotocol";
-import * as utils from "shared/src/utils";
+import * as utils from "shared/utils";
 import * as main from "./extension";
+import * as debug from "./debug";
 
 type DisassembleResponse = DebugProtocol.DisassembleResponse['body'];
 
@@ -43,8 +44,8 @@ export class DisassemblyView {
 
 		panel.webview.options = {enableScripts: true};
 
-		main.DebugSession.get_wrapper(session.id).onDidChangeState(state => {
-			if (state === main.State.Inactive)
+		debug.Session.get_wrapper(session.id).onDidChangeState(state => {
+			if (state === debug.State.Inactive)
 				panel.dispose();
 		});
 
@@ -148,8 +149,8 @@ export class DisassemblyView {
 class DisassemblyDocument implements vscode.CustomDocument {
 	constructor(readonly uri: vscode.Uri) {}
 	resolve(webviewPanel: vscode.WebviewPanel) {
-		if (this.uri.scheme === main.DebugMemoryFileSystem.SCHEME) {
-			const {session, offset, memoryReference} = main.DebugMemoryFileSystem.parseUri(this.uri);
+		if (this.uri.scheme === debug.MemoryFileSystem.SCHEME) {
+			const {session, offset, memoryReference} = debug.MemoryFileSystem.parseUri(this.uri);
 			new DisassemblyView(webviewPanel, session.session, +memoryReference + (offset?.fromOffset ?? 0), offset?.toOffset ?? 1024);
 		}
 	}

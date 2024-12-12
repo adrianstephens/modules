@@ -12,7 +12,7 @@
 		"dynamic library"
 	],
 	"icon": "assets/icon.png",
-	"version": "0.1.0",
+	"version": "1.0.0",
 	"publisher": "isopodlabs",
 	"repository": "https://github.com/adrianstephens/vscode-modules",
 	"files": [
@@ -32,6 +32,16 @@
 	"activationEvents": [],
 	"main": "./out/src/extension.js",
 	"contributes": {
+		"configuration": {
+			"title": "Modules",
+			"properties": {
+				"modules.useHex": {
+					"type": "boolean",
+					"default": false,
+					"description": "Use Debug Modules' hex editor for debug panes"
+				}
+			}
+		},
 		"customEditors": [
 			{
 				"viewType": "modules.dllView",

@@ -1,11 +1,12 @@
 
 import * as vscode from "vscode";
 import * as path from "path";
-import * as utils from "shared/src/utils";
+import * as utils from "shared/utils";
 import {DebugProtocol} from '@vscode/debugprotocol';
-import {CSP, Nonce, id_selector} from "shared/src/jsx-runtime";
+import {CSP, Nonce, id_selector} from "shared/jsx-runtime";
 //import * as telemetry from "./telemetry";
-import * as main from "./extension";
+import * as main from "extension";
+import * as debug from "debug";
 
 //-----------------------------------------------------------------------------
 //	ModuleViewProvider
@@ -102,11 +103,11 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 			vscode.commands.registerCommand('modules.getModules', () => Object.values(this.modules))
 		));
 
-		main.DebugSession.onCreate(session => {
+		debug.Session.onCreate(session => {
 			this.session = session.session;
 			session.onMessage(message => this.onDidSendMessage(message));
 			session.onDidChangeState(state => {
-				if (state === main.State.Inactive) {
+				if (state === debug.State.Inactive) {
 					this.session			= undefined;
 					this.nextOrder			= 0;
 					this.selected_id		= undefined;
@@ -147,7 +148,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 
 		webviewView.webview.options = {
 			enableScripts: true,
-			localResourceRoots: [main.extension_context.extensionUri]
+			//localResourceRoots: [main.extension_context.extensionUri]
 		};
 
 		webviewView.webview.onDidReceiveMessage(async message => {
@@ -168,11 +169,11 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 						//vscode.commands.executeCommand('workbench.debug.viewlet.action.viewMemory', m.addressRange);
 						//const uri = main.DebugMemory.makeUri(this.session, m.addressRange, undefined, m.name);
 						//await vscode.commands.executeCommand('vscode.openWith', uri, 'hexEditor.hexedit', {preview: true});
-						const uri = main.DebugMemoryFileSystem.makeUri(this.session, m.addressRange, undefined, m.name);
+						const uri = debug.MemoryFileSystem.makeUri(this.session, m.addressRange, undefined, m.name);
 						vscode.commands.executeCommand('vscode.openWith', uri, 'hex.view', {preview: true});
 
 					} else if (this.session && m.sourceReference) {
-						main.openPreview(main.DebugSource.makeUri(this.session, m.sourceReference, path.extname(m.name) ? m.name : m.name + '.js'));
+						main.openPreview(debug.SourceProvider.makeUri(this.session, m.sourceReference, path.extname(m.name) ? m.name : m.name + '.js'));
 					} else if (m.path) {
 						main.openPreview(vscode.Uri.file(m.path));
 					}
@@ -184,7 +185,7 @@ export class ModuleWebViewProvider implements vscode.WebviewViewProvider {
 					if (m.path && await vscode.workspace.fs.stat(vscode.Uri.file(m.path)).then(()=>true, ()=>false)) {
 						uri = vscode.Uri.file(m.path);
 					} else if (this.session && m.addressRange) {
-						uri = main.DebugMemoryFileSystem.makeUri(this.session, m.addressRange, {fromOffset:0, toOffset:m.vsModuleSize}, m.name);
+						uri = debug.MemoryFileSystem.makeUri(this.session, m.addressRange, {fromOffset:0, toOffset:m.vsModuleSize}, m.name);
 					}
 					if (uri) {
 						if (path.extname(m.name))
