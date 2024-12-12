@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'shared/src/fs';
 import * as path from 'path';
 import { DebugProtocol } from '@vscode/debugprotocol';
-import { Icon, CSP, Nonce, codicons, iconAttributes } from "shared/src/jsx-runtime";
+import { CSP, Nonce, codicons, iconAttributes } from "shared/src/jsx-runtime";
 import * as main from "./extension";
 import * as utils from "shared/src/utils";
 import * as binary from 'shared/src/binary';
@@ -58,7 +58,8 @@ function Data({name, data, context}: {name?: string, data: Uint8Array, context: 
 }
 
 function Memory({name, mm, context}: {name?: string, mm: utils.MappedMemory, context: Context}) {
-	context.memory_refs[mm.data.byteOffset] = mm.data;
+	const key = mm.flags & utils.MEM.RELATIVE ? mm.data.byteOffset : mm.address;
+	context.memory_refs[key] = mm.data;
 	return <div class='select binary' data-offset={mm.data.byteOffset} data-length={mm.data.byteLength} data-address={mm.address} data-flags={mm.flags} icon={codicons.fileBinary}>
 		{`${name && (name + ': ')}0x${mm.address.toString(16)}[0x${mm.data!.byteLength.toString(16)}] ${MemoryFlags(mm.flags)}`}
 	</div>;
@@ -127,18 +128,47 @@ async function findModule(name: string) {
 //	PORTABLE EXECUTABLE
 //-----------------------------------------------------------------------------
 
-function getMemory(uri: vscode.Uri, data: Uint8Array) : binary.memory {
+async function getDebugMemory(session: vscode.DebugSession, address: bigint, len: number) {
+	const memoryReference = `0x${address.toString(16)}`;
+
+	const resp = await session.customRequest('readMemory', {memoryReference, count: len});
+	if (!resp.data)
+		return new Uint8Array(0);;
+
+	const b = Buffer.from(resp.data, 'base64');
+	if (!resp.unreadableBytes)
+		return new Uint8Array(b);
+
+	let result = new Uint8Array(len);
+	b.copy(result);
+
+	for (let offset = b.length + resp.unreadableBytes; offset < len;) {
+		try {
+			const resp = await session.customRequest('readMemory', {memoryReference, offset, count: len - offset});
+			if (resp.data) {
+				const b = Buffer.from(resp.data, 'base64');
+				b.copy(result, offset);
+				offset += b.length;
+			}
+			if (!resp.unreadableBytes)
+				break;//end of memory
+			offset += resp.unreadableBytes;
+			
+		} catch (e) {
+			console.warn(`Failed to read memory at offset ${offset}:`, e);
+			offset += 4096; // Skip a page on error
+		}
+	}
+	
+	return result;
+}
+
+function getMemory(uri: vscode.Uri, data: Uint8Array) : binary.memory|undefined {
 	if (uri.scheme === main.DebugMemoryFileSystem.SCHEME) {
 		const {session} = main.DebugMemoryFileSystem.parseUri(uri);
 		return {
-			async get(address: bigint, len?: number) {
-				const resp = await session.session.customRequest('readMemory', {offset:address, count: len});
-				return new Uint8Array(resp.data.data);
-			}
+			async get(address: bigint, len: number) { return getDebugMemory(session.session, address, len); }
 		}
-		
-	} else {
-		return binary.arrayMemory(data)
 	}
 }
 
@@ -329,7 +359,7 @@ class DllEditor {
 							}
 						}
 
-					} else if (message.offset) {
+					} else if (+message.length) {
 						//binary
 						const offset	= +message.offset;
 						const length	= +message.length;
@@ -337,6 +367,7 @@ class DllEditor {
 						const session	= vscode.debug.activeDebugSession;
 						const module	= session && await findModule(path.parse(dll.uri.path).name);
 						const address	= module && (flags & utils.MEM.RELATIVE) ? +message.address + +module.addressRange! : +message.address;
+						const key 		= flags & utils.MEM.RELATIVE ? offset : address;
 							
 						// if exec is set, see if we can disassemble it
 						if (module && (flags & utils.MEM.EXECUTE) && await DisassemblyView.canDisassemble(session, address)) {
@@ -346,7 +377,7 @@ class DllEditor {
 							return;
 						}
 						// if it's in memory_refs, use it
-						const ref = this.memory_refs[offset];
+						const ref = this.memory_refs[key];
 						if (ref) {
 							vscode.commands.executeCommand('hex.open', ref, message.text, viewOptions);
 							return;
@@ -427,6 +458,9 @@ export class DllEditorProvider implements vscode.CustomReadonlyEditorProvider {
 	}
 
 	async resolveCustomEditor(dll: DLLDocument, webviewPanel: vscode.WebviewPanel, token: vscode.CancellationToken): Promise<void> {
+		if (dll.mach)
+			await dll.mach.ready;
+
 		const editor = new DllEditor(dll, webviewPanel);
 	}
 	
